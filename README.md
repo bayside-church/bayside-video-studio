@@ -12,9 +12,9 @@ Self-serve video recording kiosk built with Electron, React, and FFmpeg. Users r
 
 ```bash
 npm install
-cp .env.example .env
-# Fill in your Mux and Mailgun credentials in .env
 ```
+
+Credentials (Mux, Mailgun, admin PIN) are configured through the in-app admin panel and stored encrypted on disk via Electron's `safeStorage`.
 
 ## Development
 
@@ -55,12 +55,6 @@ src/
     store/        # Zustand session store
   shared/         # Types and constants shared across processes
 ```
-
-## Environment Variables
-
-See `.env.example` for all required configuration.
-
-**Important:** In production, set environment variables on the host machine rather than shipping a `.env` file in the app bundle.
 
 ## Hardware Setup
 
