@@ -8,6 +8,17 @@ const config: ForgeConfig = {
     icon: './assets/icon',
     asar: true,
     extraResource: [path.resolve(__dirname, 'resources', 'ffmpeg')],
+    osxSign: {
+      identity: 'Developer ID Application: Bayside Church (6RSR5NNF9Q)',
+      optionsForFile: () => ({
+        entitlements: './entitlements.plist',
+      }),
+    },
+    osxNotarize: {
+      appleId: process.env.APPLE_ID!,
+      appleIdPassword: process.env.APPLE_ID_PASSWORD!,
+      teamId: '6RSR5NNF9Q',
+    },
   },
   makers: [
     {
