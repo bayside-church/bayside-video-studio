@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { BaysideAPI, PreviewFrame, UploadProgress, VideoDevice, AudioDevice, GuideSettings, AdminSettings } from '../shared/types';
+import type { BaysideAPI, PreviewFrame, UploadProgress, VideoDevice, AudioDevice, GuideSettings, AdminSettings, PaginatedAzureAssets } from '../shared/types';
 
 const api: BaysideAPI = {
   detectDevice: () => ipcRenderer.invoke('bayside:detect-device'),
@@ -14,6 +14,9 @@ const api: BaysideAPI = {
   listAssets: (page?: number) => ipcRenderer.invoke('bayside:list-assets', page),
   resendDownload: (assetId: string, email: string) =>
     ipcRenderer.invoke('bayside:resend-download', assetId, email),
+  listAzureBlobs: (page?: number) => ipcRenderer.invoke('bayside:list-azure-blobs', page),
+  resendAzureDownload: (blobName: string, email: string) =>
+    ipcRenderer.invoke('bayside:resend-azure-download', blobName, email),
   saveBrowserRecording: (buffer: ArrayBuffer, email?: string) =>
     ipcRenderer.invoke('bayside:save-browser-recording', buffer, email),
   saveAudioRecording: (buffer: ArrayBuffer) =>

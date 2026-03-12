@@ -68,6 +68,20 @@ export interface PaginatedAssetsResult {
   nextPage: number;
 }
 
+export interface AzureBlobSummary {
+  name: string;
+  email: string;
+  uploadedAt: string;
+  url: string;
+  size: number;
+}
+
+export interface PaginatedAzureAssets {
+  assets: AzureBlobSummary[];
+  hasMore: boolean;
+  nextPage: number;
+}
+
 export interface BaysideAPI {
   // FFmpeg
   detectDevice: () => Promise<string | null>;
@@ -90,6 +104,10 @@ export interface BaysideAPI {
   uploadVideo: (filePath: string, email: string) => Promise<void>;
   listAssets: (page?: number) => Promise<PaginatedAssetsResult>;
   resendDownload: (assetId: string, email: string) => Promise<void>;
+
+  // Azure
+  listAzureBlobs: (page?: number) => Promise<PaginatedAzureAssets>;
+  resendAzureDownload: (blobName: string, email: string) => Promise<void>;
 
   // Events
   onPreviewFrame: (callback: (frame: PreviewFrame) => void) => () => void;
@@ -131,4 +149,6 @@ export interface AdminSettings {
   emailFromAddress: string;
   maxRecordingSeconds: number;
   idleTimeoutSeconds: number;
+  azureBlobConnectionString: string;
+  azureBlobContainerName: string;
 }

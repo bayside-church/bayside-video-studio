@@ -148,19 +148,6 @@ export async function sendPlaybackEmail(
             </td>
           </tr>
 
-          <!-- 24-hour warning badge -->
-          <tr>
-            <td align="center" style="padding:20px 32px 0 32px;">
-              <table role="presentation" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="background-color:rgba(129,140,248,0.08);border:1px solid rgba(129,140,248,0.15);border-radius:10px;padding:10px 18px;">
-                    <span style="color:#818cf8;font-size:13px;font-weight:600;">&#9201;&ensp;This link expires in 24 hours</span>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
           <!-- Divider -->
           <tr>
             <td style="padding:32px 32px 0 32px;">

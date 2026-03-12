@@ -44,7 +44,7 @@ function decrypt(stored: string): string {
 }
 
 // Fields stored encrypted on disk
-const SECRET_FIELDS = new Set(['adminPin', 'muxTokenId', 'muxTokenSecret', 'mailgunApiKey']);
+const SECRET_FIELDS = new Set(['adminPin', 'muxTokenId', 'muxTokenSecret', 'mailgunApiKey', 'azureBlobConnectionString']);
 
 interface Settings {
   selectedDevice: VideoDevice | null;
@@ -62,6 +62,8 @@ interface Settings {
   emailFromAddress: string;
   maxRecordingSeconds: number;
   idleTimeoutSeconds: number;
+  azureBlobConnectionString: string;
+  azureBlobContainerName: string;
 }
 
 function getDefaults(): Settings {
@@ -81,6 +83,8 @@ function getDefaults(): Settings {
     emailFromAddress: '',
     maxRecordingSeconds: 0,
     idleTimeoutSeconds: 0,
+    azureBlobConnectionString: '',
+    azureBlobContainerName: '',
   };
 }
 
@@ -275,6 +279,28 @@ export function setIdleTimeoutSeconds(value: number): void {
   writeSettings(settings);
 }
 
+// --- Azure Blob Storage ---
+
+export function getAzureBlobConnectionString(): string {
+  return readSettings().azureBlobConnectionString ?? '';
+}
+
+export function setAzureBlobConnectionString(value: string): void {
+  const settings = readSettings();
+  settings.azureBlobConnectionString = value;
+  writeSettings(settings);
+}
+
+export function getAzureBlobContainerName(): string {
+  return readSettings().azureBlobContainerName ?? '';
+}
+
+export function setAzureBlobContainerName(value: string): void {
+  const settings = readSettings();
+  settings.azureBlobContainerName = value;
+  writeSettings(settings);
+}
+
 // --- Configuration validation ---
 
 export function getMissingRequiredSettings(): string[] {
@@ -286,5 +312,7 @@ export function getMissingRequiredSettings(): string[] {
   if (!getEmailFromAddress()) missing.push('Email From Address');
   if (!getMaxRecordingSeconds()) missing.push('Max Recording Duration');
   if (!getIdleTimeoutSeconds()) missing.push('Idle Timeout');
+  if (!getAzureBlobConnectionString()) missing.push('Azure Blob Connection String');
+  if (!getAzureBlobContainerName()) missing.push('Azure Blob Container Name');
   return missing;
 }

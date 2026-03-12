@@ -13,6 +13,8 @@ import {
   getEmailFromName, setEmailFromName, getEmailFromAddress, setEmailFromAddress,
   getMaxRecordingSeconds, setMaxRecordingSeconds,
   getIdleTimeoutSeconds, setIdleTimeoutSeconds,
+  getAzureBlobConnectionString, setAzureBlobConnectionString,
+  getAzureBlobContainerName, setAzureBlobContainerName,
   getMissingRequiredSettings,
   type GuideSettings,
 } from '../settings';
@@ -23,7 +25,9 @@ import { sendPlaybackEmail } from '../email/sender';
 import { deleteRecording } from '../cleanup';
 import { getRecordingsDir, TEMP_FALLBACK_DIR } from '../config';
 import { DEFAULT_STORAGE_DIR } from '../settings';
-import type { VideoDevice, AudioDevice, MuxAssetSummary } from '../../shared/types';
+import { uploadToAzureBlob } from '../azure/upload';
+import { listAzureBlobs, getAzureDownloadUrl } from '../azure/assets';
+import type { VideoDevice, AudioDevice, MuxAssetSummary, PaginatedAzureAssets } from '../../shared/types';
 
 export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
   ipcMain.handle('bayside:detect-device', async () => {
@@ -199,15 +203,23 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     // Get asset ID quickly so we can return to the UI
     const { assetId, playbackId } = await getAssetInfo(uploadId);
 
-    // Fire-and-forget: wait for master URL, then send email
-    const downloadFilename = path.basename(filePath);
+    // Fire-and-forget: upload to Azure, then send email with Azure URL
     (async () => {
       try {
-        const masterUrl = await waitForMasterUrl(assetId, downloadFilename);
-        await sendPlaybackEmail(email, masterUrl, playbackId);
-        console.log(`[Email] Sent master download link to ${email}`);
+        const azureUrl = await uploadToAzureBlob(filePath, email, win);
+        await sendPlaybackEmail(email, azureUrl, playbackId);
+        console.log(`[Email] Sent Azure download link to ${email}`);
       } catch (err) {
-        console.error(`[Background] Failed to send email: ${err}`);
+        console.error(`[Background] Azure upload or email failed: ${err}`);
+        // Fallback: try Mux master URL
+        try {
+          const downloadFilename = path.basename(filePath);
+          const masterUrl = await waitForMasterUrl(assetId, downloadFilename);
+          await sendPlaybackEmail(email, masterUrl, playbackId);
+          console.log(`[Email] Fallback: sent Mux master download link to ${email}`);
+        } catch (fallbackErr) {
+          console.error(`[Background] Fallback email also failed: ${fallbackErr}`);
+        }
       }
     })();
   });
@@ -227,6 +239,21 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     const masterUrl = await enableMasterAccess(assetId);
     await sendPlaybackEmail(email, masterUrl, playbackId);
     console.log(`[Email] Re-sent master download link for ${assetId} to ${email}`);
+  });
+
+  // --- Azure Blob Storage ---
+
+  ipcMain.handle('bayside:list-azure-blobs', async (_event, page?: number): Promise<PaginatedAzureAssets> => {
+    return await listAzureBlobs(page ?? 1);
+  });
+
+  ipcMain.handle('bayside:resend-azure-download', async (_event, blobName: string, email: string) => {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error('Invalid email address');
+    }
+    const url = getAzureDownloadUrl(blobName);
+    await sendPlaybackEmail(email, url);
+    console.log(`[Email] Re-sent Azure download link for ${blobName} to ${email}`);
   });
 
   ipcMain.handle('bayside:save-audio-recording', async (_event, buffer: ArrayBuffer) => {
@@ -325,6 +352,8 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
       emailFromAddress: getEmailFromAddress(),
       maxRecordingSeconds: getMaxRecordingSeconds(),
       idleTimeoutSeconds: getIdleTimeoutSeconds(),
+      azureBlobConnectionString: getAzureBlobConnectionString(),
+      azureBlobContainerName: getAzureBlobContainerName(),
     };
   });
 
@@ -337,6 +366,8 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     emailFromAddress?: string;
     maxRecordingSeconds?: number;
     idleTimeoutSeconds?: number;
+    azureBlobConnectionString?: string;
+    azureBlobContainerName?: string;
   }) => {
     if (settings.muxTokenId !== undefined) setMuxTokenId(settings.muxTokenId);
     if (settings.muxTokenSecret !== undefined) setMuxTokenSecret(settings.muxTokenSecret);
@@ -346,6 +377,8 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     if (settings.emailFromAddress !== undefined) setEmailFromAddress(settings.emailFromAddress);
     if (settings.maxRecordingSeconds !== undefined) setMaxRecordingSeconds(settings.maxRecordingSeconds);
     if (settings.idleTimeoutSeconds !== undefined) setIdleTimeoutSeconds(settings.idleTimeoutSeconds);
+    if (settings.azureBlobConnectionString !== undefined) setAzureBlobConnectionString(settings.azureBlobConnectionString);
+    if (settings.azureBlobContainerName !== undefined) setAzureBlobContainerName(settings.azureBlobContainerName);
   });
 
   ipcMain.handle('bayside:get-max-recording-seconds', async () => {
