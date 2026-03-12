@@ -1,4 +1,4 @@
-import type { VideoDevice } from '../../shared/types';
+import type { VideoDevice, AudioDevice } from '../../shared/types';
 
 /**
  * Enumerate browser videoinput devices that FFmpeg can't see
@@ -7,13 +7,20 @@ import type { VideoDevice } from '../../shared/types';
 export async function listBrowserVideoDevices(
   ffmpegDeviceNames: string[]
 ): Promise<VideoDevice[]> {
-  // Request a temporary stream to populate device labels
+  // Check if labels are already available (from a previous permission grant)
+  const preCheck = await navigator.mediaDevices.enumerateDevices();
+  const hasLabels = preCheck.some((d) => d.kind === 'videoinput' && d.label);
+
+  // Only request a temp stream if labels aren't available yet.
+  // Use audio-only to avoid disrupting an active FFmpeg video preview.
   let tempStream: MediaStream | null = null;
-  try {
-    tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
-  } catch {
-    // No video permission or no devices — return empty
-    return [];
+  if (!hasLabels) {
+    try {
+      tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      // No permission or no devices — return empty
+      return [];
+    }
   }
 
   try {
@@ -45,6 +52,54 @@ export async function listBrowserVideoDevices(
 
     return result;
   } finally {
-    tempStream.getTracks().forEach((t) => t.stop());
+    tempStream?.getTracks().forEach((t) => t.stop());
   }
+}
+
+/**
+ * Get the set of currently connected device labels from the browser.
+ * Uses enumerateDevices() which doesn't open any hardware.
+ */
+async function getConnectedDeviceLabels(): Promise<{ video: string[]; audio: string[] }> {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return {
+      video: devices
+        .filter((d) => d.kind === 'videoinput' && d.label)
+        .map((d) => d.label.toLowerCase()),
+      audio: devices
+        .filter((d) => d.kind === 'audioinput' && d.label)
+        .map((d) => d.label.toLowerCase()),
+    };
+  } catch {
+    return { video: [], audio: [] };
+  }
+}
+
+function fuzzyMatch(ffmpegName: string, browserLabels: string[]): boolean {
+  const name = ffmpegName.toLowerCase();
+  return browserLabels.some((label) => label.includes(name) || name.includes(label));
+}
+
+/**
+ * Filter an FFmpeg video device list to only include currently connected devices.
+ * Cross-references against browser enumerateDevices() labels.
+ */
+export async function filterConnectedVideoDevices(devices: VideoDevice[]): Promise<VideoDevice[]> {
+  const { video: connectedLabels } = await getConnectedDeviceLabels();
+  if (connectedLabels.length === 0) return devices; // Can't filter without labels
+  return devices.filter((d) => {
+    if (d.format === 'browser') return true; // Browser devices are already verified
+    return fuzzyMatch(d.name, connectedLabels);
+  });
+}
+
+/**
+ * Filter an FFmpeg audio device list to only include currently connected devices.
+ * Cross-references against browser enumerateDevices() labels.
+ */
+export async function filterConnectedAudioDevices(devices: AudioDevice[]): Promise<AudioDevice[]> {
+  const { audio: connectedLabels } = await getConnectedDeviceLabels();
+  if (connectedLabels.length === 0) return devices; // Can't filter without labels
+  return devices.filter((d) => fuzzyMatch(d.name, connectedLabels));
 }

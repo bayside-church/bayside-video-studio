@@ -10,7 +10,7 @@ import RecordingGuides from '../components/RecordingGuides';
 import { useSessionStore } from '../store/useSessionStore';
 import type { VideoDevice, AudioDevice, MuxAssetSummary, AzureBlobSummary, GuideSettings, AdminSettings } from '../../shared/types';
 import { probeAudioDevice } from '../utils/audioDevices';
-import { listBrowserVideoDevices } from '../utils/browserDevices';
+import { listBrowserVideoDevices, filterConnectedVideoDevices, filterConnectedAudioDevices } from '../utils/browserDevices';
 import { startPreview as startBrowserPreview, stopPreview as stopBrowserPreview, getStream } from '../utils/browserCapture';
 import logoSrc from '../../../assets/logo.png';
 
@@ -405,15 +405,18 @@ function CameraPanel({
         window.baysideAPI.getSelectedDevice(),
       ]);
 
+      // Filter to only currently connected devices using browser enumerateDevices
+      const connectedFfmpeg = await filterConnectedVideoDevices(ffmpegList);
+
       // Also discover browser-only devices (e.g. Blackmagic UltraStudio)
       let browserDevices: VideoDevice[] = [];
       try {
-        browserDevices = await listBrowserVideoDevices(ffmpegList.map((d) => d.name));
+        browserDevices = await listBrowserVideoDevices(connectedFfmpeg.map((d) => d.name));
       } catch (err) {
         console.warn('Failed to list browser devices:', err);
       }
 
-      setDevices([...ffmpegList, ...browserDevices]);
+      setDevices([...connectedFfmpeg, ...browserDevices]);
       setSelected(current);
     } catch (err) {
       console.error('Failed to list devices:', err);
@@ -539,7 +542,9 @@ function MicPanel({ onDeviceChanged }: { onDeviceChanged: (id: string | null) =>
         window.baysideAPI.listAudioDevices(),
         window.baysideAPI.getSelectedAudioDevice(),
       ]);
-      setDevices(list);
+      // Filter to only currently connected devices using browser enumerateDevices
+      const connected = await filterConnectedAudioDevices(list);
+      setDevices(connected);
       setSelected(current);
     } catch (err) {
       console.error('Failed to list audio devices:', err);
