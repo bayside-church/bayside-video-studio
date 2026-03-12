@@ -113,8 +113,15 @@ export default function HomeScreen() {
     }
   }, [previewReady, deviceMissing, restartPreview]);
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!isValid || !configured) return;
+    // Kill the preview process now so the countdown screen doesn't show a
+    // frozen frame while FFmpeg tears down. The countdown will display over
+    // a clean dark background, and recording FFmpeg will provide fresh
+    // preview frames once it spins up.
+    if (!browserStream) {
+      await window.baysideAPI.stopPreview().catch(() => {});
+    }
     setScreen('countdown');
   };
 

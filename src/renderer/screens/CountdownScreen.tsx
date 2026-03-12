@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import VideoPreview from '../components/VideoPreview';
 import CountdownOverlay from '../components/CountdownOverlay';
@@ -10,52 +10,62 @@ import { getStream, startRecording as startBrowserRecording, startAudioOnlyRecor
 export default function CountdownScreen() {
   const { email, setScreen, setError, isBrowserCapture } = useSessionStore();
   const [count, setCount] = useState(COUNTDOWN_SECONDS);
+  const recordingStartedRef = useRef(false);
+  const recordingReadyRef = useRef(false);
 
+  // Start recording immediately on mount so the FFmpeg process spins up
+  // while the countdown is displayed. Preview frames will appear behind the
+  // overlay as soon as FFmpeg begins outputting them.
   useEffect(() => {
-    if (count <= 0) {
-      let cancelled = false;
-      (async () => {
-        try {
-          if (isBrowserCapture) {
-            startBrowserRecording();
-          } else {
-            // Check if FFmpeg will capture audio directly (DeckLink + external mic).
-            // In that case, skip renderer audio — FFmpeg handles sync internally.
-            const ffmpegHandlesAudio = await window.baysideAPI.usesFFmpegAudio();
+    if (recordingStartedRef.current) return;
+    recordingStartedRef.current = true;
 
-            if (!ffmpegHandlesAudio) {
-              // Start audio-only recording FIRST (fast ~200ms) so it captures
-              // from before video starts. The lead time is measured and compensated
-              // during post-recording merge.
-              const audioDevice = await window.baysideAPI.getSelectedAudioDevice();
-              if (audioDevice) {
-                try {
-                  await startAudioOnlyRecording(audioDevice.name);
-                } catch (err) {
-                  console.warn('[Countdown] Failed to start renderer audio:', err);
-                }
+    (async () => {
+      try {
+        if (isBrowserCapture) {
+          startBrowserRecording();
+        } else {
+          const ffmpegHandlesAudio = await window.baysideAPI.usesFFmpegAudio();
+
+          if (!ffmpegHandlesAudio) {
+            const audioDevice = await window.baysideAPI.getSelectedAudioDevice();
+            if (audioDevice) {
+              try {
+                await startAudioOnlyRecording(audioDevice.name);
+              } catch (err) {
+                console.warn('[Countdown] Failed to start renderer audio:', err);
               }
-            } else {
-              console.log('[Countdown] FFmpeg handles audio (DeckLink + external mic), skipping renderer audio capture');
             }
+          } else {
+            console.log('[Countdown] FFmpeg handles audio (DeckLink + external mic), skipping renderer audio capture');
+          }
 
-            // Start video recording (slow ~1s — stops preview, spawns FFmpeg)
-            await window.baysideAPI.startRecording(email);
-          }
-          if (cancelled) return;
-          setScreen('recording');
-        } catch (err) {
-          if (!cancelled) {
-            setError(`Failed to start recording: ${err}`);
-          }
+          await window.baysideAPI.startRecording(email);
         }
-      })();
-      return () => { cancelled = true; };
+        recordingReadyRef.current = true;
+      } catch (err) {
+        setError(`Failed to start recording: ${err}`);
+      }
+    })();
+  }, []);
+
+  // Visual countdown — purely cosmetic. When it finishes, transition to
+  // recording screen (recording is already running by then).
+  useEffect(() => {
+    if (count > 0) {
+      const timer = setTimeout(() => setCount(count - 1), 1000);
+      return () => clearTimeout(timer);
     }
 
-    const timer = setTimeout(() => setCount(count - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [count, setScreen, setError]);
+    // count === 0 — wait for recording to be ready if it isn't already
+    const check = setInterval(() => {
+      if (recordingReadyRef.current) {
+        clearInterval(check);
+        setScreen('recording');
+      }
+    }, 50);
+    return () => clearInterval(check);
+  }, [count, setScreen]);
 
   const browserStream = isBrowserCapture ? getStream() : null;
 
@@ -63,7 +73,7 @@ export default function CountdownScreen() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      exit={{ opacity: 1 }}
       transition={{ duration: 0.3 }}
       className="h-full relative"
     >
