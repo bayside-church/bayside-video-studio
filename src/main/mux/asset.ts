@@ -1,19 +1,13 @@
 import { MUX_POLL_INTERVAL_MS, MUX_POLL_TIMEOUT_MS } from '../../shared/constants';
 import { getMux } from './client';
-import { friendlyDownloadFilename } from '../util/filename';
+import { buildDownloadFilename } from '../util/filename';
 import type { MuxAssetSummary } from '../../shared/types';
 
 /**
  * Append a custom download filename to a Mux master URL.
  * Uses the &download= query parameter convention.
  */
-function withDownloadFilename(masterUrl: string, filename?: string, assetCreatedAt?: string): string {
-  if (!filename) {
-    const date = assetCreatedAt
-      ? new Date(Number(assetCreatedAt) * 1000)
-      : new Date();
-    filename = friendlyDownloadFilename(date);
-  }
+function withDownloadFilename(masterUrl: string, filename: string): string {
   const separator = masterUrl.includes('?') ? '&' : '?';
   return `${masterUrl}${separator}download=${encodeURIComponent(filename)}`;
 }
@@ -54,7 +48,7 @@ export async function getAssetInfo(uploadId: string): Promise<{ assetId: string;
  * Master access is an async process that completes after the asset is ready.
  * The URL expires after 24 hours.
  */
-export async function waitForMasterUrl(assetId: string, downloadFilename?: string): Promise<string> {
+export async function waitForMasterUrl(assetId: string, downloadFilename: string): Promise<string> {
   // Allow up to 10 minutes for encoding + master generation
   const timeout = Math.max(MUX_POLL_TIMEOUT_MS, 10 * 60 * 1000);
   const startTime = Date.now();
@@ -68,7 +62,7 @@ export async function waitForMasterUrl(assetId: string, downloadFilename?: strin
 
     const master = asset.master;
     if (master?.status === 'ready' && master?.url) {
-      const url = withDownloadFilename(master.url, downloadFilename, asset.created_at);
+      const url = withDownloadFilename(master.url, downloadFilename);
       console.log(`[Mux] Master URL ready: ${url}`);
       return url;
     }
@@ -120,11 +114,16 @@ export async function listMuxAssets(page: number = 1, limit: number = 20): Promi
  * Re-enable master access on an asset and wait for the download URL.
  * Returns the temporary master URL (expires in 24 hours).
  */
-export async function enableMasterAccess(assetId: string): Promise<string> {
-  // Check if master is already ready
+export async function enableMasterAccess(assetId: string, email: string): Promise<string> {
   const asset = await getMux().video.assets.retrieve(assetId);
+  const createdDate = asset.created_at
+    ? new Date(Number(asset.created_at) * 1000)
+    : new Date();
+  const filename = buildDownloadFilename(email, createdDate);
+
+  // Check if master is already ready
   if (asset.master?.status === 'ready' && asset.master?.url) {
-    const url = withDownloadFilename(asset.master.url, undefined, asset.created_at);
+    const url = withDownloadFilename(asset.master.url, filename);
     console.log(`[Mux] Master already available: ${url}`);
     return url;
   }
@@ -133,7 +132,7 @@ export async function enableMasterAccess(assetId: string): Promise<string> {
   await getMux().video.assets.updateMasterAccess(assetId, { master_access: 'temporary' });
   console.log(`[Mux] Enabled master access for asset ${assetId}`);
 
-  return await waitForMasterUrl(assetId);
+  return await waitForMasterUrl(assetId, filename);
 }
 
 function sleep(ms: number): Promise<void> {

@@ -20,6 +20,7 @@ import {
 } from '../settings';
 import { createUploadAndSend } from '../mux/upload';
 import { getAssetInfo, waitForMasterUrl, listMuxAssets, enableMasterAccess, type PaginatedAssets } from '../mux/asset';
+import { buildDownloadFilename } from '../util/filename';
 import { getMux } from '../mux/client';
 import { sendPlaybackEmail } from '../email/sender';
 import { generateGif } from '../ffmpeg/gif';
@@ -222,7 +223,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
         console.error(`[Background] Azure upload or email failed: ${err}`);
         // Fallback: try Mux master URL
         try {
-          const masterUrl = await waitForMasterUrl(assetId);
+          const masterUrl = await waitForMasterUrl(assetId, buildDownloadFilename(email));
           await sendPlaybackEmail(email, masterUrl, gifPath);
           console.log(`[Email] Fallback: sent Mux master download link to ${email}`);
         } catch (fallbackErr) {
@@ -247,7 +248,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     }
     // Update passthrough with the latest email
     await getMux().video.assets.update(assetId, { passthrough: email });
-    const masterUrl = await enableMasterAccess(assetId);
+    const masterUrl = await enableMasterAccess(assetId, email);
     await sendPlaybackEmail(email, masterUrl);
     console.log(`[Email] Re-sent master download link for ${assetId} to ${email}`);
   });

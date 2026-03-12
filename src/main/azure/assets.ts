@@ -1,5 +1,4 @@
 import { getContainerClient, generateDownloadSasUrl } from './client';
-import { friendlyFilenameFromBlob } from '../util/filename';
 import type { AzureBlobSummary, PaginatedAzureAssets } from '../../shared/types';
 
 export async function listAzureBlobs(page = 1, limit = 20): Promise<PaginatedAzureAssets> {
@@ -40,5 +39,5 @@ export async function listAzureBlobs(page = 1, limit = 20): Promise<PaginatedAzu
 }
 
 export function getAzureDownloadUrl(blobName: string): string {
-  return generateDownloadSasUrl(blobName, friendlyFilenameFromBlob(blobName));
+  return generateDownloadSasUrl(blobName, blobName);
 }
