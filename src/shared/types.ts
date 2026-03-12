@@ -7,18 +7,6 @@ export type Screen =
   | 'error'
   | 'unavailable';
 
-export interface MuxAssetSummary {
-  id: string;
-  playbackId: string | null;
-  status: string;
-  duration: number | null;
-  resolution: string | null;
-  createdAt: string;
-  isTest: boolean;
-  masterReady: boolean;
-  email: string | null;
-}
-
 export interface SessionState {
   screen: Screen;
   email: string;
@@ -62,12 +50,6 @@ export interface GuideSettings {
   safeZones: boolean;
 }
 
-export interface PaginatedAssetsResult {
-  assets: MuxAssetSummary[];
-  hasMore: boolean;
-  nextPage: number;
-}
-
 export interface AzureBlobSummary {
   name: string;
   email: string;
@@ -100,13 +82,10 @@ export interface BaysideAPI {
   getSelectedAudioDevice: () => Promise<AudioDevice | null>;
   selectAudioDevice: (device: AudioDevice | null) => Promise<void>;
 
-  // Mux
+  // Upload & videos
   uploadVideo: (filePath: string, email: string) => Promise<void>;
-  listAssets: (page?: number) => Promise<PaginatedAssetsResult>;
-  resendDownload: (assetId: string, email: string) => Promise<void>;
-
-  // Azure
   listAzureBlobs: (page?: number) => Promise<PaginatedAzureAssets>;
+  getAzurePreviewUrl: (blobName: string) => Promise<string>;
   resendAzureDownload: (blobName: string, email: string) => Promise<void>;
 
   // Events
@@ -122,8 +101,6 @@ export interface BaysideAPI {
   resetSession: () => Promise<void>;
 
   // Admin
-  getTestMode: () => Promise<boolean>;
-  setTestMode: (enabled: boolean) => Promise<void>;
   verifyAdminPin: (pin: string) => Promise<boolean>;
   setAdminPin: (pin: string) => Promise<void>;
   getGuides: () => Promise<GuideSettings>;
@@ -141,8 +118,6 @@ export interface BaysideAPI {
 }
 
 export interface AdminSettings {
-  muxTokenId: string;
-  muxTokenSecret: string;
   mailgunApiKey: string;
   mailgunDomain: string;
   emailFromName: string;

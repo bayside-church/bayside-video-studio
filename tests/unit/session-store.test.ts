@@ -31,8 +31,8 @@ describe('useSessionStore', () => {
   });
 
   it('sets playback URL', () => {
-    useSessionStore.getState().setPlaybackUrl('https://stream.mux.com/abc.m3u8');
-    expect(useSessionStore.getState().playbackUrl).toBe('https://stream.mux.com/abc.m3u8');
+    useSessionStore.getState().setPlaybackUrl('https://example.blob.core.windows.net/videos/test.mp4');
+    expect(useSessionStore.getState().playbackUrl).toBe('https://example.blob.core.windows.net/videos/test.mp4');
   });
 
   it('sets error and transitions to error screen', () => {

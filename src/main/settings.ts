@@ -44,18 +44,15 @@ function decrypt(stored: string): string {
 }
 
 // Fields stored encrypted on disk
-const SECRET_FIELDS = new Set(['adminPin', 'muxTokenId', 'muxTokenSecret', 'mailgunApiKey', 'azureBlobConnectionString']);
+const SECRET_FIELDS = new Set(['adminPin', 'mailgunApiKey', 'azureBlobConnectionString']);
 
 interface Settings {
   selectedDevice: VideoDevice | null;
   selectedAudioDevice: AudioDevice | null;
-  testMode: boolean;
   adminPin: string;
   guides: GuideSettings;
   storageDir: string;
   autoDeleteOnUpload: boolean;
-  muxTokenId: string;
-  muxTokenSecret: string;
   mailgunApiKey: string;
   mailgunDomain: string;
   emailFromName: string;
@@ -70,13 +67,10 @@ function getDefaults(): Settings {
   return {
     selectedDevice: null,
     selectedAudioDevice: null,
-    testMode: false,
     adminPin: '1234',
     guides: DEFAULT_GUIDES,
     storageDir: DEFAULT_STORAGE_DIR,
     autoDeleteOnUpload: true,
-    muxTokenId: '',
-    muxTokenSecret: '',
     mailgunApiKey: '',
     mailgunDomain: '',
     emailFromName: '',
@@ -139,16 +133,6 @@ export function setSelectedAudioDevice(device: AudioDevice | null): void {
   writeSettings(settings);
 }
 
-export function getTestMode(): boolean {
-  return readSettings().testMode ?? false;
-}
-
-export function setTestMode(enabled: boolean): void {
-  const settings = readSettings();
-  settings.testMode = enabled;
-  writeSettings(settings);
-}
-
 export function getAdminPin(): string {
   return readSettings().adminPin ?? '1234';
 }
@@ -191,26 +175,6 @@ export function setAutoDeleteOnUpload(enabled: boolean): void {
 }
 
 // --- Service credentials ---
-
-export function getMuxTokenId(): string {
-  return readSettings().muxTokenId ?? '';
-}
-
-export function setMuxTokenId(value: string): void {
-  const settings = readSettings();
-  settings.muxTokenId = value;
-  writeSettings(settings);
-}
-
-export function getMuxTokenSecret(): string {
-  return readSettings().muxTokenSecret ?? '';
-}
-
-export function setMuxTokenSecret(value: string): void {
-  const settings = readSettings();
-  settings.muxTokenSecret = value;
-  writeSettings(settings);
-}
 
 export function getMailgunApiKey(): string {
   return readSettings().mailgunApiKey ?? '';
@@ -305,8 +269,6 @@ export function setAzureBlobContainerName(value: string): void {
 
 export function getMissingRequiredSettings(): string[] {
   const missing: string[] = [];
-  if (!getMuxTokenId()) missing.push('Mux Token ID');
-  if (!getMuxTokenSecret()) missing.push('Mux Token Secret');
   if (!getMailgunApiKey()) missing.push('Mailgun API Key');
   if (!getMailgunDomain()) missing.push('Mailgun Domain');
   if (!getEmailFromAddress()) missing.push('Email From Address');

@@ -6,9 +6,8 @@ import { listAllDevices, listAllAudioDevices } from '../ffmpeg/devices';
 import { ffmpegController, probeVideoDevice, probeDeckLinkDevice } from '../ffmpeg/controller';
 import {
   getSelectedDevice, setSelectedDevice, getSelectedAudioDevice, setSelectedAudioDevice,
-  getTestMode, setTestMode, getAdminPin, setAdminPin, getGuides, setGuides,
+  getAdminPin, setAdminPin, getGuides, setGuides,
   getStorageDir, setStorageDir, getAutoDeleteOnUpload, setAutoDeleteOnUpload,
-  getMuxTokenId, setMuxTokenId, getMuxTokenSecret, setMuxTokenSecret,
   getMailgunApiKey, setMailgunApiKey, getMailgunDomain, setMailgunDomain,
   getEmailFromName, setEmailFromName, getEmailFromAddress, setEmailFromAddress,
   getMaxRecordingSeconds, setMaxRecordingSeconds,
@@ -18,18 +17,14 @@ import {
   getMissingRequiredSettings,
   type GuideSettings,
 } from '../settings';
-import { createUploadAndSend } from '../mux/upload';
-import { getAssetInfo, waitForMasterUrl, listMuxAssets, enableMasterAccess, type PaginatedAssets } from '../mux/asset';
-import { buildDownloadFilename } from '../util/filename';
-import { getMux } from '../mux/client';
 import { sendPlaybackEmail } from '../email/sender';
 import { generateGif } from '../ffmpeg/gif';
 import { deleteRecording } from '../cleanup';
 import { getRecordingsDir, TEMP_FALLBACK_DIR } from '../config';
 import { DEFAULT_STORAGE_DIR } from '../settings';
 import { uploadToAzureBlob } from '../azure/upload';
-import { listAzureBlobs, getAzureDownloadUrl } from '../azure/assets';
-import type { VideoDevice, AudioDevice, MuxAssetSummary, PaginatedAzureAssets } from '../../shared/types';
+import { listAzureBlobs, getAzureDownloadUrl, getAzurePreviewUrl } from '../azure/assets';
+import type { VideoDevice, AudioDevice, PaginatedAzureAssets } from '../../shared/types';
 
 export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
   ipcMain.handle('bayside:detect-device', async () => {
@@ -203,16 +198,6 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
       console.warn(`[GIF] Generation failed, email will be sent without preview: ${err}`);
     }
 
-    // Upload the file to Mux
-    const uploadId = await createUploadAndSend(filePath, win, email);
-    if (getAutoDeleteOnUpload()) {
-      deleteRecording(filePath);
-    }
-    activeUploadPath = null;
-
-    // Get asset ID quickly so we can return to the UI
-    const { assetId } = await getAssetInfo(uploadId);
-
     // Fire-and-forget: upload to Azure, then send email with Azure URL
     (async () => {
       try {
@@ -221,15 +206,11 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
         console.log(`[Email] Sent Azure download link to ${email}`);
       } catch (err) {
         console.error(`[Background] Azure upload or email failed: ${err}`);
-        // Fallback: try Mux master URL
-        try {
-          const masterUrl = await waitForMasterUrl(assetId, buildDownloadFilename(email));
-          await sendPlaybackEmail(email, masterUrl, gifPath);
-          console.log(`[Email] Fallback: sent Mux master download link to ${email}`);
-        } catch (fallbackErr) {
-          console.error(`[Background] Fallback email also failed: ${fallbackErr}`);
-        }
       } finally {
+        if (getAutoDeleteOnUpload()) {
+          deleteRecording(filePath);
+        }
+        activeUploadPath = null;
         // Clean up the GIF file after sending
         if (gifPath) {
           try { fs.unlinkSync(gifPath); } catch { /* ignore */ }
@@ -238,25 +219,14 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     })();
   });
 
-  ipcMain.handle('bayside:list-assets', async (_event, page?: number): Promise<PaginatedAssets> => {
-    return await listMuxAssets(page ?? 1);
-  });
-
-  ipcMain.handle('bayside:resend-download', async (_event, assetId: string, email: string) => {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      throw new Error('Invalid email address');
-    }
-    // Update passthrough with the latest email
-    await getMux().video.assets.update(assetId, { passthrough: email });
-    const masterUrl = await enableMasterAccess(assetId, email);
-    await sendPlaybackEmail(email, masterUrl);
-    console.log(`[Email] Re-sent master download link for ${assetId} to ${email}`);
-  });
-
   // --- Azure Blob Storage ---
 
   ipcMain.handle('bayside:list-azure-blobs', async (_event, page?: number): Promise<PaginatedAzureAssets> => {
     return await listAzureBlobs(page ?? 1);
+  });
+
+  ipcMain.handle('bayside:get-azure-preview-url', async (_event, blobName: string): Promise<string> => {
+    return getAzurePreviewUrl(blobName);
   });
 
   ipcMain.handle('bayside:resend-azure-download', async (_event, blobName: string, email: string) => {
@@ -296,14 +266,6 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
   });
 
   // Admin settings
-  ipcMain.handle('bayside:get-test-mode', async () => {
-    return getTestMode();
-  });
-
-  ipcMain.handle('bayside:set-test-mode', async (_event, enabled: boolean) => {
-    setTestMode(enabled);
-  });
-
   ipcMain.handle('bayside:verify-admin-pin', async (_event, pin: string) => {
     return pin === getAdminPin();
   });
@@ -356,8 +318,6 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('bayside:get-admin-settings', async () => {
     return {
-      muxTokenId: getMuxTokenId(),
-      muxTokenSecret: getMuxTokenSecret(),
       mailgunApiKey: getMailgunApiKey(),
       mailgunDomain: getMailgunDomain(),
       emailFromName: getEmailFromName(),
@@ -370,8 +330,6 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
   });
 
   ipcMain.handle('bayside:set-admin-settings', async (_event, settings: {
-    muxTokenId?: string;
-    muxTokenSecret?: string;
     mailgunApiKey?: string;
     mailgunDomain?: string;
     emailFromName?: string;
@@ -381,8 +339,6 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     azureBlobConnectionString?: string;
     azureBlobContainerName?: string;
   }) => {
-    if (settings.muxTokenId !== undefined) setMuxTokenId(settings.muxTokenId);
-    if (settings.muxTokenSecret !== undefined) setMuxTokenSecret(settings.muxTokenSecret);
     if (settings.mailgunApiKey !== undefined) setMailgunApiKey(settings.mailgunApiKey);
     if (settings.mailgunDomain !== undefined) setMailgunDomain(settings.mailgunDomain);
     if (settings.emailFromName !== undefined) setEmailFromName(settings.emailFromName);

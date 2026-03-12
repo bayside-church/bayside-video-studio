@@ -8,7 +8,7 @@ const mockAPI: BaysideAPI = {
   stopPreview: vi.fn().mockResolvedValue(undefined),
   startRecording: vi.fn().mockResolvedValue(undefined),
   stopRecording: vi.fn().mockResolvedValue({ filePath: '/tmp/test.mp4', durationSeconds: 10 }),
-  uploadVideo: vi.fn().mockResolvedValue('https://stream.mux.com/test123.m3u8'),
+  uploadVideo: vi.fn().mockResolvedValue(undefined),
   sendEmail: vi.fn().mockResolvedValue(undefined),
   resetSession: vi.fn().mockResolvedValue(undefined),
   onPreviewFrame: vi.fn().mockReturnValue(() => {}),

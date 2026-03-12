@@ -11,10 +11,8 @@ const api: BaysideAPI = {
     ipcRenderer.invoke('bayside:stop-recording', rendererAudioPath),
   uploadVideo: (filePath: string, email: string) =>
     ipcRenderer.invoke('bayside:upload-video', filePath, email),
-  listAssets: (page?: number) => ipcRenderer.invoke('bayside:list-assets', page),
-  resendDownload: (assetId: string, email: string) =>
-    ipcRenderer.invoke('bayside:resend-download', assetId, email),
   listAzureBlobs: (page?: number) => ipcRenderer.invoke('bayside:list-azure-blobs', page),
+  getAzurePreviewUrl: (blobName: string) => ipcRenderer.invoke('bayside:get-azure-preview-url', blobName),
   resendAzureDownload: (blobName: string, email: string) =>
     ipcRenderer.invoke('bayside:resend-azure-download', blobName, email),
   saveBrowserRecording: (buffer: ArrayBuffer, email?: string) =>
@@ -24,8 +22,6 @@ const api: BaysideAPI = {
   resetSession: () => ipcRenderer.invoke('bayside:reset-session'),
 
   // Admin
-  getTestMode: () => ipcRenderer.invoke('bayside:get-test-mode'),
-  setTestMode: (enabled: boolean) => ipcRenderer.invoke('bayside:set-test-mode', enabled),
   verifyAdminPin: (pin: string) => ipcRenderer.invoke('bayside:verify-admin-pin', pin),
   setAdminPin: (pin: string) => ipcRenderer.invoke('bayside:set-admin-pin', pin),
   getGuides: () => ipcRenderer.invoke('bayside:get-guides'),

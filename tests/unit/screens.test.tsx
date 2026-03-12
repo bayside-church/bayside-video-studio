@@ -50,7 +50,7 @@ describe('CompleteScreen', () => {
     useSessionStore.getState().reset();
     useSessionStore.getState().setScreen('complete');
     useSessionStore.getState().setEmail('user@test.com');
-    useSessionStore.getState().setPlaybackUrl('https://stream.mux.com/abc.m3u8');
+    useSessionStore.getState().setPlaybackUrl('https://example.blob.core.windows.net/videos/test.mp4');
   });
 
   it('shows check your email message', () => {

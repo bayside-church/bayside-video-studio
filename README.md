@@ -1,6 +1,6 @@
 # Bayside Video Studio
 
-Self-serve video recording kiosk built with Electron, React, and FFmpeg. Users record a short video at an unattended kiosk, and the app uploads it to Mux and emails them a playback link via Mailgun.
+Self-serve video recording kiosk built with Electron, React, and FFmpeg. Users record a short video at an unattended kiosk, and the app uploads it to Azure Blob Storage and emails them a download link via Mailgun.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ Self-serve video recording kiosk built with Electron, React, and FFmpeg. Users r
 npm install
 ```
 
-Credentials (Mux, Mailgun, admin PIN) are configured through the in-app admin panel and stored encrypted on disk via Electron's `safeStorage`.
+Credentials (Azure, Mailgun, admin PIN) are configured through the in-app admin panel and stored encrypted on disk via Electron's `safeStorage`.
 
 ## Development
 
@@ -58,7 +58,7 @@ The app runs in kiosk/fullscreen mode in production. To auto-start on boot:
 src/
   main/           # Electron main process
     ffmpeg/       # FFmpeg device detection & recording controller
-    mux/          # Mux upload & asset polling
+    azure/        # Azure Blob Storage upload & asset listing
     email/        # Mailgun email sender
     ipc/          # IPC handler registration
   preload/        # contextBridge API (renderer ↔ main)

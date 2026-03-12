@@ -25,6 +25,21 @@ export function getContainerClient(): ContainerClient {
   return containerClient;
 }
 
+export function generatePreviewSasUrl(blobName: string): string {
+  const container = getContainerClient();
+
+  const sasToken = generateBlobSASQueryParameters({
+    containerName: container.containerName,
+    blobName,
+    permissions: BlobSASPermissions.parse('r'),
+    startsOn: new Date(),
+    expiresOn: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+    contentType: 'video/mp4',
+  }, credential!).toString();
+
+  return `${container.url}/${blobName}?${sasToken}`;
+}
+
 export function generateDownloadSasUrl(blobName: string, downloadFilename: string): string {
   // Ensure client + credential are initialized
   const container = getContainerClient();

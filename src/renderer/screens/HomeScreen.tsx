@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import MuxPlayer from '@mux/mux-player-react';
 import BigButton from '../components/BigButton';
 import EmailInput from '../components/EmailInput';
 import VideoPreview from '../components/VideoPreview';
@@ -8,15 +7,13 @@ import AudioMeter from '../components/AudioMeter';
 import Sidebar from '../components/Sidebar';
 import RecordingGuides from '../components/RecordingGuides';
 import { useSessionStore } from '../store/useSessionStore';
-import type { VideoDevice, AudioDevice, MuxAssetSummary, AzureBlobSummary, GuideSettings, AdminSettings } from '../../shared/types';
+import type { VideoDevice, AudioDevice, AzureBlobSummary, GuideSettings, AdminSettings } from '../../shared/types';
 import { probeAudioDevice } from '../utils/audioDevices';
 import { listBrowserVideoDevices, filterConnectedVideoDevices, filterConnectedAudioDevices } from '../utils/browserDevices';
 import { startPreview as startBrowserPreview, stopPreview as stopBrowserPreview, getStream } from '../utils/browserCapture';
 import logoSrc from '../../../assets/logo.png';
 
-type SidebarPanel = 'camera' | 'mic' | 'videos' | 'azure-videos' | 'guides' | 'admin' | null;
-
-let videoPanelKey = 0;
+type SidebarPanel = 'camera' | 'mic' | 'videos' | 'guides' | 'admin' | null;
 
 export default function HomeScreen() {
   const { email, setEmail, setScreen, setError, setGuides: setStoreGuides, setIsBrowserCapture } = useSessionStore();
@@ -70,11 +67,7 @@ export default function HomeScreen() {
   }, []);
 
   const togglePanel = useCallback((panel: SidebarPanel) => {
-    setActivePanel((cur) => {
-      const opening = cur !== panel;
-      if (opening && panel === 'videos') videoPanelKey++;
-      return opening ? panel : null;
-    });
+    setActivePanel((cur) => cur !== panel ? panel : null);
   }, []);
 
   const restartPreview = useCallback(async () => {
@@ -173,16 +166,9 @@ export default function HomeScreen() {
         <ToolbarIcon
           active={activePanel === 'videos'}
           onClick={() => togglePanel('videos')}
-          title="Past Videos"
+          title="Videos"
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-2.625 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0 1 18 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 7.746 6 7.125v-1.5M4.875 8.25C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0 1 18 7.125v-1.5m1.125 2.625c-.621 0-1.125.504-1.125 1.125v1.5m2.625-2.625c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M18 5.625v5.25M7.125 12h9.75m-9.75 0A1.125 1.125 0 0 1 6 10.875M7.125 12C6.504 12 6 12.504 6 13.125m0-2.25C6 11.496 5.496 12 4.875 12M18 10.875c0 .621-.504 1.125-1.125 1.125M18 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m-12 5.25v-5.25m0 5.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125m-12 0v-1.5c0-.621-.504-1.125-1.125-1.125M18 18.375v-5.25m0 5.25v-1.5c0-.621.504-1.125 1.125-1.125M18 13.125v1.5c0 .621.504 1.125 1.125 1.125M18 13.125c0-.621.504-1.125 1.125-1.125M6 13.125v1.5c0 .621-.504 1.125-1.125 1.125M6 13.125C6 12.504 5.496 12 4.875 12m-1.5 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125M19.125 12h1.5m0 0c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125m-17.25 0h1.5m14.25 0h1.5" />
-        </ToolbarIcon>
-        <ToolbarIcon
-          active={activePanel === 'azure-videos'}
-          onClick={() => togglePanel('azure-videos')}
-          title="Azure Videos"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 .75-7.425A4.502 4.502 0 0 0 14.25 7.5a4.5 4.5 0 0 0-4.06 2.544A4.5 4.5 0 0 0 2.25 15Z" />
         </ToolbarIcon>
         <ToolbarIcon
           active={activePanel === 'guides'}
@@ -279,13 +265,8 @@ export default function HomeScreen() {
         }} />
       </Sidebar>
 
-      {/* Past Videos sidebar */}
-      <Sidebar open={activePanel === 'videos'} onClose={() => setActivePanel(null)} title="Past Videos">
-        <PastVideosPanel key={videoPanelKey} />
-      </Sidebar>
-
-      {/* Azure Videos sidebar */}
-      <Sidebar open={activePanel === 'azure-videos'} onClose={() => setActivePanel(null)} title="Azure Videos">
+      {/* Videos sidebar */}
+      <Sidebar open={activePanel === 'videos'} onClose={() => setActivePanel(null)} title="Videos">
         <AzureVideosPanel />
       </Sidebar>
 
@@ -621,233 +602,7 @@ function MicPanel({ onDeviceChanged }: { onDeviceChanged: (id: string | null) =>
   );
 }
 
-// --- Past Videos panel ---
-
-function PastVideosPanel() {
-  const [assets, setAssets] = useState<MuxAssetSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
-  const [nextPage, setNextPage] = useState(2);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [email, setEmail] = useState('');
-  const [sending, setSending] = useState<string | null>(null);
-  const [sent, setSent] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const hasMoreRef = useRef(false);
-  const loadingMoreRef = useRef(false);
-  hasMoreRef.current = hasMore;
-  loadingMoreRef.current = loadingMore;
-
-  useEffect(() => {
-    loadAssets();
-  }, []);
-
-  async function loadAssets() {
-    setLoading(true);
-    try {
-      const result = await window.baysideAPI.listAssets(1);
-      setAssets(result.assets);
-      setHasMore(result.hasMore);
-      setNextPage(result.nextPage);
-    } catch (err) {
-      console.error('Failed to load assets:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const loadMoreRef = useRef<() => void>(undefined);
-
-  async function loadMore() {
-    if (loadingMoreRef.current || !hasMoreRef.current) return;
-    setLoadingMore(true);
-    try {
-      const result = await window.baysideAPI.listAssets(nextPage);
-      setAssets((prev) => [...prev, ...result.assets]);
-      setHasMore(result.hasMore);
-      setNextPage(result.nextPage);
-    } catch (err) {
-      console.error('Failed to load more assets:', err);
-    } finally {
-      setLoadingMore(false);
-    }
-  }
-
-  loadMoreRef.current = loadMore;
-
-  useEffect(() => {
-    const node = scrollContainerRef.current;
-    if (!node) return;
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = node;
-      if (scrollHeight - scrollTop - clientHeight < 100) {
-        loadMoreRef.current?.();
-      }
-    };
-    node.addEventListener('scroll', handleScroll);
-    return () => node.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  async function handleResend(assetId: string) {
-    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError('Enter a valid email');
-      return;
-    }
-    setError(null);
-    setSending(assetId);
-    setSent(null);
-    try {
-      await window.baysideAPI.resendDownload(assetId, email.trim());
-      setSent(assetId);
-    } catch (err) {
-      setError(`Failed: ${err instanceof Error ? err.message : err}`);
-    } finally {
-      setSending(null);
-    }
-  }
-
-  function formatDuration(seconds: number | null): string {
-    if (seconds == null) return '--:--';
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  }
-
-  function formatDate(dateStr: string): string {
-    if (!dateStr) return '';
-    const d = new Date(Number(dateStr) * 1000);
-    return d.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  }
-
-  const selected = assets.find((a) => a.id === selectedId);
-
-  return (
-    <div className="flex flex-col h-full">
-      {/* Asset list */}
-      <div className="flex-1 overflow-y-auto" ref={scrollContainerRef}>
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-6 h-6 border-2 border-surface-border border-t-accent rounded-full animate-spin" />
-          </div>
-        ) : assets.length === 0 ? (
-          <div className="py-12 text-center px-4">
-            <p className="text-text-secondary text-sm">No videos found</p>
-          </div>
-        ) : (
-          assets.map((asset) => {
-            const isActive = asset.id === selectedId;
-            return (
-              <button
-                key={asset.id}
-                onClick={() => {
-                  if (!isActive) {
-                    setEmail(asset.email ?? '');
-                  }
-                  setSelectedId(isActive ? null : asset.id);
-                  setError(null);
-                  setSent(null);
-                }}
-                className={`
-                  w-full text-left px-5 py-3 border-b border-white/[0.04] transition-colors cursor-pointer
-                  ${isActive ? 'bg-accent-muted' : 'hover:bg-white/[0.03]'}
-                `}
-              >
-                <div className="flex items-center justify-between mb-0.5">
-                  <p className={`text-sm font-semibold truncate ${isActive ? 'text-accent' : 'text-text-primary'}`}>
-                    {formatDate(asset.createdAt)}
-                  </p>
-                  {asset.isTest && (
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded ml-2 flex-shrink-0">
-                      Test
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3 text-xs text-text-tertiary">
-                  <span>{formatDuration(asset.duration)}</span>
-                  {asset.resolution && <span>{asset.resolution}</span>}
-                  <span className={`capitalize ${
-                    asset.status === 'ready' ? 'text-success' :
-                    asset.status === 'errored' ? 'text-red-400' : ''
-                  }`}>
-                    {asset.status}
-                  </span>
-                </div>
-                {asset.email && (
-                  <p className="text-[11px] text-text-tertiary mt-0.5 truncate">{asset.email}</p>
-                )}
-
-                {/* Expanded: re-send form */}
-                {isActive && asset.status === 'ready' && (
-                  <div
-                    className="mt-3 pt-3 border-t border-white/[0.06]"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {asset.playbackId && (
-                      <div className="w-full aspect-video rounded-lg overflow-hidden mb-3">
-                        <MuxPlayer
-                          playbackId={asset.playbackId}
-                          streamType="on-demand"
-                          style={{ width: '100%', height: '100%', borderRadius: '0.5rem' }}
-                        />
-                      </div>
-                    )}
-                    <p className="text-xs text-text-tertiary mb-2">Re-send download link</p>
-                    <div className="flex gap-1.5">
-                      <input
-                        type="email"
-                        placeholder="email@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleResend(asset.id)}
-                        className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-surface-base text-text-primary text-xs placeholder:text-text-tertiary outline-none shadow-[0_0_0_1px_rgba(255,255,255,0.08)] focus:shadow-[0_0_0_1px_rgba(129,140,248,0.5)] transition-shadow"
-                      />
-                      <button
-                        onClick={() => handleResend(asset.id)}
-                        disabled={sending !== null}
-                        className="px-3 py-2 rounded-lg text-xs font-semibold text-white bg-accent hover:bg-accent-hover transition-colors cursor-pointer disabled:opacity-50 flex-shrink-0"
-                      >
-                        {sending === asset.id ? '...' : 'Send'}
-                      </button>
-                    </div>
-                    {error && <p className="text-red-400 text-[11px] mt-2">{error}</p>}
-                    {sent === asset.id && (
-                      <p className="text-success text-[11px] mt-2">Sent!</p>
-                    )}
-                  </div>
-                )}
-              </button>
-            );
-          })
-        )}
-        {loadingMore && (
-          <div className="flex items-center justify-center py-4">
-            <div className="w-5 h-5 border-2 border-surface-border border-t-accent rounded-full animate-spin" />
-          </div>
-        )}
-      </div>
-
-      {/* Refresh button */}
-      <div className="px-5 py-3 border-t border-white/[0.06]">
-        <button
-          onClick={loadAssets}
-          disabled={loading}
-          className="w-full py-2 text-xs text-accent hover:text-accent-hover font-medium transition-colors cursor-pointer disabled:opacity-40"
-        >
-          {loading ? 'Loading...' : 'Refresh'}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// --- Azure Videos panel ---
+// --- Videos panel ---
 
 function AzureVideosPanel() {
   const [blobs, setBlobs] = useState<AzureBlobSummary[]>([]);
@@ -860,6 +615,8 @@ function AzureVideosPanel() {
   const [sending, setSending] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasMoreRef = useRef(false);
   const loadingMoreRef = useRef(false);
@@ -960,7 +717,7 @@ function AzureVideosPanel() {
           </div>
         ) : blobs.length === 0 ? (
           <div className="py-12 text-center px-4">
-            <p className="text-text-secondary text-sm">No Azure videos found</p>
+            <p className="text-text-secondary text-sm">No videos found</p>
           </div>
         ) : (
           blobs.map((blob) => {
@@ -968,11 +725,24 @@ function AzureVideosPanel() {
             return (
               <button
                 key={blob.name}
-                onClick={() => {
-                  if (!isActive) {
+                onClick={async () => {
+                  if (isActive) {
+                    setSelectedName(null);
+                    setPreviewUrl(null);
+                  } else {
                     setEmail(blob.email ?? '');
+                    setSelectedName(blob.name);
+                    setPreviewUrl(null);
+                    setLoadingPreview(true);
+                    try {
+                      const url = await window.baysideAPI.getAzurePreviewUrl(blob.name);
+                      setPreviewUrl(url);
+                    } catch {
+                      setPreviewUrl(null);
+                    } finally {
+                      setLoadingPreview(false);
+                    }
                   }
-                  setSelectedName(isActive ? null : blob.name);
                   setError(null);
                   setSent(null);
                 }}
@@ -998,6 +768,20 @@ function AzureVideosPanel() {
                     className="mt-3 pt-3 border-t border-white/[0.06]"
                     onClick={(e) => e.stopPropagation()}
                   >
+                    {/* Video preview */}
+                    {loadingPreview ? (
+                      <div className="flex items-center justify-center py-6 mb-3">
+                        <div className="w-5 h-5 border-2 border-surface-border border-t-accent rounded-full animate-spin" />
+                      </div>
+                    ) : previewUrl ? (
+                      <video
+                        src={previewUrl}
+                        controls
+                        className="w-full rounded-lg mb-3"
+                        style={{ maxHeight: '200px' }}
+                      />
+                    ) : null}
+
                     <p className="text-xs text-text-tertiary mb-2">Re-send download link</p>
                     <div className="flex gap-1.5">
                       <input
@@ -1052,7 +836,6 @@ function AdminPanel() {
   const [authenticated, setAuthenticated] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
-  const [testMode, setTestMode] = useState(false);
   const [newPin, setNewPin] = useState('');
   const [pinSaved, setPinSaved] = useState(false);
   const [storageDir, setStorageDir] = useState('');
@@ -1063,7 +846,6 @@ function AdminPanel() {
 
   useEffect(() => {
     if (authenticated) {
-      window.baysideAPI.getTestMode().then(setTestMode);
       window.baysideAPI.getStorageDir().then(setStorageDir);
       window.baysideAPI.getAutoDelete().then(setAutoDelete);
       window.baysideAPI.getAdminSettings().then(setSvcSettings);
@@ -1087,12 +869,6 @@ function AdminPanel() {
         setTimeout(() => pinInputRef.current?.focus(), 50);
       }
     }
-  }
-
-  async function handleToggleTestMode() {
-    const next = !testMode;
-    await window.baysideAPI.setTestMode(next);
-    setTestMode(next);
   }
 
   async function handleSavePin() {
@@ -1155,24 +931,6 @@ function AdminPanel() {
 
   return (
     <div className="p-4 space-y-4">
-      {/* Test Mode toggle */}
-      <div className="flex items-center justify-between px-3.5 py-3 rounded-xl bg-surface-overlay shadow-[0_0_0_1px_rgba(255,255,255,0.06)]">
-        <div>
-          <p className="text-sm font-semibold text-text-primary">Test Mode</p>
-          <p className="text-xs text-text-tertiary mt-0.5">Mux uploads marked as test</p>
-        </div>
-        <button
-          onClick={handleToggleTestMode}
-          className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
-            testMode ? 'bg-accent' : 'bg-surface-base'
-          }`}
-        >
-          <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-            testMode ? 'translate-x-[22px]' : 'translate-x-0.5'
-          }`} />
-        </button>
-      </div>
-
       {/* Change PIN */}
       <div className="px-3.5 py-3 rounded-xl bg-surface-overlay shadow-[0_0_0_1px_rgba(255,255,255,0.06)]">
         <p className="text-sm font-semibold text-text-primary mb-0.5">Change PIN</p>
@@ -1245,8 +1003,6 @@ function AdminPanel() {
             <p className="text-xs text-text-tertiary mb-3">API keys and configuration</p>
           </div>
 
-          <AdminField label="Mux Token ID" value={svcSettings.muxTokenId} onChange={(v) => updateSvc('muxTokenId', v)} />
-          <AdminField label="Mux Token Secret" value={svcSettings.muxTokenSecret} onChange={(v) => updateSvc('muxTokenSecret', v)} secret />
           <AdminField label="Mailgun API Key" value={svcSettings.mailgunApiKey} onChange={(v) => updateSvc('mailgunApiKey', v)} secret />
           <AdminField label="Mailgun Domain" value={svcSettings.mailgunDomain} onChange={(v) => updateSvc('mailgunDomain', v)} placeholder="mailgun.yourdomain.com" />
           <AdminField label="Email From Name" value={svcSettings.emailFromName} onChange={(v) => updateSvc('emailFromName', v)} placeholder="Bayside Video Studio" />

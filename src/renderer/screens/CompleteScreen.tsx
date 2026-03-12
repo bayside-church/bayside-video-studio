@@ -62,22 +62,6 @@ export default function CompleteScreen() {
         </motion.p>
       </div>
 
-      {/* 24-hour warning callout */}
-      <motion.div
-        className="relative z-10 flex items-center gap-3 px-5 py-3 rounded-2xl border border-accent-muted"
-        style={{ background: 'rgba(129, 140, 248, 0.08)' }}
-        initial={{ y: 8, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.46 }}
-      >
-        <svg className="w-5 h-5 text-accent shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <p className="text-sm text-text-primary font-medium">
-          Please download your file within 24 hours — the link will expire.
-        </p>
-      </motion.div>
-
       {/* Go Again button */}
       <motion.button
         className="relative z-10 mt-4 px-8 py-3 rounded-2xl bg-surface-overlay text-text-secondary font-semibold text-base border border-surface-border hover:border-surface-border-hover hover:text-text-primary transition-colors cursor-pointer"
