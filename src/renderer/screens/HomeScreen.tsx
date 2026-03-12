@@ -32,6 +32,18 @@ export default function HomeScreen() {
 
     (async () => {
       try {
+        // Log media permission status for debugging
+        try {
+          const micPerm = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+          const camPerm = await navigator.permissions.query({ name: 'camera' as PermissionName });
+          console.log(`[Permissions] microphone=${micPerm.state}, camera=${camPerm.state}`);
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioLabels = devices.filter((d) => d.kind === 'audioinput').map((d) => d.label || '(empty)');
+          console.log(`[Permissions] Audio device labels: ${JSON.stringify(audioLabels)}`);
+        } catch (err) {
+          console.warn('[Permissions] Could not query permissions:', err);
+        }
+
         const missing = await window.baysideAPI.getMissingSettings();
         if (cancelled) return;
         setMissingSettings(missing);
