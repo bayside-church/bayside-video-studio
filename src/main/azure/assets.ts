@@ -1,4 +1,5 @@
 import { getContainerClient, generateDownloadSasUrl } from './client';
+import { friendlyFilenameFromBlob } from '../util/filename';
 import type { AzureBlobSummary, PaginatedAzureAssets } from '../../shared/types';
 
 export async function listAzureBlobs(page = 1, limit = 20): Promise<PaginatedAzureAssets> {
@@ -39,13 +40,5 @@ export async function listAzureBlobs(page = 1, limit = 20): Promise<PaginatedAzu
 }
 
 export function getAzureDownloadUrl(blobName: string): string {
-  // Extract a friendly filename from the blob name (strip date prefix and hash suffix)
-  const ext = blobName.match(/\.\w+$/)?.[0] ?? '.mp4';
-  const parts = blobName.match(/^(\d{8})_/);
-  const dateStr = parts?.[1];
-  let downloadFilename = `Bayside-Recording${ext}`;
-  if (dateStr) {
-    downloadFilename = `Bayside-Recording-${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}${ext}`;
-  }
-  return generateDownloadSasUrl(blobName, downloadFilename);
+  return generateDownloadSasUrl(blobName, friendlyFilenameFromBlob(blobName));
 }

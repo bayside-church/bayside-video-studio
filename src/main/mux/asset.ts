@@ -1,24 +1,18 @@
 import { MUX_POLL_INTERVAL_MS, MUX_POLL_TIMEOUT_MS } from '../../shared/constants';
 import { getMux } from './client';
+import { friendlyDownloadFilename } from '../util/filename';
 import type { MuxAssetSummary } from '../../shared/types';
 
 /**
  * Append a custom download filename to a Mux master URL.
  * Uses the &download= query parameter convention.
- * If an explicit filename is provided, use it directly; otherwise generate one from the asset timestamp.
  */
 function withDownloadFilename(masterUrl: string, filename?: string, assetCreatedAt?: string): string {
   if (!filename) {
     const date = assetCreatedAt
       ? new Date(Number(assetCreatedAt) * 1000)
       : new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const stamp = `${year}-${month}-${day}-${hours}${minutes}`;
-    filename = `Bayside-Recording-${stamp}.mp4`;
+    filename = friendlyDownloadFilename(date);
   }
   const separator = masterUrl.includes('?') ? '&' : '?';
   return `${masterUrl}${separator}download=${encodeURIComponent(filename)}`;

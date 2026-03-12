@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { BrowserWindow } from 'electron';
 import { getContainerClient, generateDownloadSasUrl } from './client';
+import { friendlyDownloadFilename } from '../util/filename';
 
 export async function uploadToAzureBlob(
   filePath: string,
@@ -22,8 +23,7 @@ export async function uploadToAzureBlob(
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
   const fileSize = fs.statSync(filePath).size;
 
-  // Use the local file's original name as the download filename
-  const downloadFilename = path.basename(filePath);
+  const downloadFilename = friendlyDownloadFilename(now, ext);
 
   await blockBlobClient.uploadFile(filePath, {
     blobHTTPHeaders: {

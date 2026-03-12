@@ -1,5 +1,6 @@
 import Mailgun from 'mailgun.js';
 import formData from 'form-data';
+import fs from 'fs';
 import { getMailgunApiKey, getMailgunDomain, getEmailFrom } from '../settings';
 
 let mg: ReturnType<InstanceType<typeof Mailgun>['client']> | null = null;
@@ -19,37 +20,23 @@ function getClient() {
 export async function sendPlaybackEmail(
   toEmail: string,
   playbackUrl: string,
-  playbackId?: string | null,
+  gifPath?: string | null,
 ): Promise<void> {
   const safeUrl = playbackUrl.replace(/"/g, '&quot;');
-  const gifUrl = playbackId ? `https://image.mux.com/${playbackId}/animated.gif?width=480&fps=12` : null;
+  const hasGif = gifPath && fs.existsSync(gifPath);
   const emailFrom = getEmailFrom();
 
-  // Pre-warm the GIF so it's cached on Mux's CDN before the recipient opens the email
-  if (gifUrl) {
-    try {
-      const { net } = await import('electron');
-      const req = net.request(gifUrl);
-      await new Promise<void>((resolve) => {
-        req.on('response', (res) => {
-          res.on('data', () => {}); // drain the response
-          res.on('end', () => resolve());
-          res.on('error', () => resolve());
-        });
-        req.on('error', () => resolve());
-        req.end();
-      });
-      console.log('[Email] GIF pre-warmed');
-    } catch {
-      console.warn('[Email] GIF pre-warm failed, sending anyway');
-    }
-  }
+  // Build inline attachments for the GIF preview (referenced via cid: in the HTML)
+  const inlineAttachments = hasGif
+    ? [{ filename: 'preview.gif', data: fs.readFileSync(gifPath), contentType: 'image/gif' }]
+    : [];
 
   await getClient().messages.create(getMailgunDomain(), {
     from: emailFrom,
     to: [toEmail],
     subject: 'Your Bayside Video Studio Recording is Ready!',
     'h:sender': emailFrom,
+    inline: inlineAttachments,
     html: `<!DOCTYPE html>
 <html>
 <head>
@@ -123,11 +110,11 @@ export async function sendPlaybackEmail(
             </td>
           </tr>
 
-          ${gifUrl ? `<!-- Video preview GIF -->
+          ${hasGif ? `<!-- Video preview GIF -->
           <tr>
             <td align="center" style="padding:24px 32px 0 32px;">
               <a href="${safeUrl}" target="_blank" style="display:block;text-decoration:none;">
-                <img src="${gifUrl}" alt="Video preview" width="456" style="display:block;width:100%;max-width:456px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);" />
+                <img src="cid:preview.gif" alt="Video preview" width="456" style="display:block;width:100%;max-width:456px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);" />
               </a>
             </td>
           </tr>` : ''}

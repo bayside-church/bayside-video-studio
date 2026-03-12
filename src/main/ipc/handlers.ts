@@ -22,6 +22,7 @@ import { createUploadAndSend } from '../mux/upload';
 import { getAssetInfo, waitForMasterUrl, listMuxAssets, enableMasterAccess, type PaginatedAssets } from '../mux/asset';
 import { getMux } from '../mux/client';
 import { sendPlaybackEmail } from '../email/sender';
+import { generateGif } from '../ffmpeg/gif';
 import { deleteRecording } from '../cleanup';
 import { getRecordingsDir, TEMP_FALLBACK_DIR } from '../config';
 import { DEFAULT_STORAGE_DIR } from '../settings';
@@ -193,6 +194,14 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     if (activeUploadPath === resolved) return;
     activeUploadPath = resolved;
 
+    // Generate GIF preview from the local video before upload/deletion
+    let gifPath: string | null = null;
+    try {
+      gifPath = await generateGif(filePath);
+    } catch (err) {
+      console.warn(`[GIF] Generation failed, email will be sent without preview: ${err}`);
+    }
+
     // Upload the file to Mux
     const uploadId = await createUploadAndSend(filePath, win, email);
     if (getAutoDeleteOnUpload()) {
@@ -201,24 +210,28 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     activeUploadPath = null;
 
     // Get asset ID quickly so we can return to the UI
-    const { assetId, playbackId } = await getAssetInfo(uploadId);
+    const { assetId } = await getAssetInfo(uploadId);
 
     // Fire-and-forget: upload to Azure, then send email with Azure URL
     (async () => {
       try {
         const azureUrl = await uploadToAzureBlob(filePath, email, win);
-        await sendPlaybackEmail(email, azureUrl, playbackId);
+        await sendPlaybackEmail(email, azureUrl, gifPath);
         console.log(`[Email] Sent Azure download link to ${email}`);
       } catch (err) {
         console.error(`[Background] Azure upload or email failed: ${err}`);
         // Fallback: try Mux master URL
         try {
-          const downloadFilename = path.basename(filePath);
-          const masterUrl = await waitForMasterUrl(assetId, downloadFilename);
-          await sendPlaybackEmail(email, masterUrl, playbackId);
+          const masterUrl = await waitForMasterUrl(assetId);
+          await sendPlaybackEmail(email, masterUrl, gifPath);
           console.log(`[Email] Fallback: sent Mux master download link to ${email}`);
         } catch (fallbackErr) {
           console.error(`[Background] Fallback email also failed: ${fallbackErr}`);
+        }
+      } finally {
+        // Clean up the GIF file after sending
+        if (gifPath) {
+          try { fs.unlinkSync(gifPath); } catch { /* ignore */ }
         }
       }
     })();
@@ -234,10 +247,8 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     }
     // Update passthrough with the latest email
     await getMux().video.assets.update(assetId, { passthrough: email });
-    const asset = await getMux().video.assets.retrieve(assetId);
-    const playbackId = asset.playback_ids?.[0]?.id ?? null;
     const masterUrl = await enableMasterAccess(assetId);
-    await sendPlaybackEmail(email, masterUrl, playbackId);
+    await sendPlaybackEmail(email, masterUrl);
     console.log(`[Email] Re-sent master download link for ${assetId} to ${email}`);
   });
 
