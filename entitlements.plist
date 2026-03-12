@@ -12,5 +12,9 @@
     <true/>
     <key>com.apple.security.device.camera</key>
     <true/>
+    <key>com.apple.security.keychain-access-groups</key>
+    <array>
+        <string>6RSR5NNF9Q.com.electron.bayside-video-studio</string>
+    </array>
 </dict>
 </plist>
