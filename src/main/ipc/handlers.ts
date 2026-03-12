@@ -14,6 +14,7 @@ import {
   getIdleTimeoutSeconds, setIdleTimeoutSeconds,
   getAzureBlobConnectionString, setAzureBlobConnectionString,
   getAzureBlobContainerName, setAzureBlobContainerName,
+  getAudioDelayMs, setAudioDelayMs,
   getMissingRequiredSettings,
   type GuideSettings,
 } from '../settings';
@@ -355,6 +356,14 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('bayside:get-idle-timeout-seconds', async () => {
     return getIdleTimeoutSeconds();
+  });
+
+  ipcMain.handle('bayside:get-audio-delay-ms', async () => {
+    return getAudioDelayMs();
+  });
+
+  ipcMain.handle('bayside:set-audio-delay-ms', async (_event, value: number) => {
+    setAudioDelayMs(value);
   });
 
   ipcMain.handle('bayside:get-missing-settings', async () => {

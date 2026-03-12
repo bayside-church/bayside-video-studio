@@ -523,9 +523,15 @@ function MicPanel({ onDeviceChanged }: { onDeviceChanged: (id: string | null) =>
   const [scanning, setScanning] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [audioDelayMs, setAudioDelayMs] = useState(0);
+  const [audioDelayDraft, setAudioDelayDraft] = useState('0');
 
   useEffect(() => {
     loadDevices();
+    window.baysideAPI.getAudioDelayMs().then((v) => {
+      setAudioDelayMs(v);
+      setAudioDelayDraft(String(v));
+    });
   }, []);
 
   async function loadDevices() {
@@ -609,6 +615,34 @@ function MicPanel({ onDeviceChanged }: { onDeviceChanged: (id: string | null) =>
 
       {error && (
         <p className="text-red-400 text-xs text-center pt-2">{error}</p>
+      )}
+
+      {selected && (
+        <div className="border-t border-surface-border mt-4 pt-4">
+          <label className="text-[11px] font-medium text-text-tertiary mb-1 block">
+            Audio Sync Correction (ms)
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={audioDelayDraft}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (/^-?\d*$/.test(v)) setAudioDelayDraft(v);
+            }}
+            onBlur={() => {
+              const parsed = parseInt(audioDelayDraft, 10) || 0;
+              const clamped = Math.max(-500, Math.min(500, parsed));
+              setAudioDelayMs(clamped);
+              setAudioDelayDraft(String(clamped));
+              window.baysideAPI.setAudioDelayMs(clamped);
+            }}
+            className="w-full px-2.5 py-1.5 rounded-lg bg-surface-base text-text-primary text-xs placeholder:text-text-tertiary outline-none shadow-[0_0_0_1px_rgba(255,255,255,0.08)] focus:shadow-[0_0_0_1px_rgba(129,140,248,0.5)] transition-shadow"
+          />
+          <p className="text-text-tertiary text-[10px] mt-1">
+            If audio plays before the video, use a positive value. If audio is behind, use a negative value. Only affects DeckLink + USB mic recordings. Range: -500 to 500.
+          </p>
+        </div>
       )}
     </div>
   );

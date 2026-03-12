@@ -61,6 +61,7 @@ interface Settings {
   idleTimeoutSeconds: number;
   azureBlobConnectionString: string;
   azureBlobContainerName: string;
+  audioDelayMs: number;
 }
 
 function getDefaults(): Settings {
@@ -79,6 +80,7 @@ function getDefaults(): Settings {
     idleTimeoutSeconds: 0,
     azureBlobConnectionString: '',
     azureBlobContainerName: '',
+    audioDelayMs: 0,
   };
 }
 
@@ -262,6 +264,18 @@ export function getAzureBlobContainerName(): string {
 export function setAzureBlobContainerName(value: string): void {
   const settings = readSettings();
   settings.azureBlobContainerName = value;
+  writeSettings(settings);
+}
+
+// --- Audio sync ---
+
+export function getAudioDelayMs(): number {
+  return readSettings().audioDelayMs ?? 0;
+}
+
+export function setAudioDelayMs(value: number): void {
+  const settings = readSettings();
+  settings.audioDelayMs = value;
   writeSettings(settings);
 }
 

@@ -81,6 +81,8 @@ export interface BaysideAPI {
   listAudioDevices: () => Promise<AudioDevice[]>;
   getSelectedAudioDevice: () => Promise<AudioDevice | null>;
   selectAudioDevice: (device: AudioDevice | null) => Promise<void>;
+  getAudioDelayMs: () => Promise<number>;
+  setAudioDelayMs: (value: number) => Promise<void>;
 
   // Upload & videos
   uploadVideo: (filePath: string, email: string) => Promise<void>;

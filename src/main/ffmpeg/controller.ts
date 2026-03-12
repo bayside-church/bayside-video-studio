@@ -12,6 +12,7 @@ import {
   PREVIEW_HEIGHT,
   FFMPEG_STOP_TIMEOUT_MS,
 } from '../../shared/constants';
+import { getAudioDelayMs } from '../settings';
 
 // JPEG SOI (Start of Image) and EOI (End of Image) markers
 const SOI = Buffer.from([0xff, 0xd8]);
@@ -227,20 +228,29 @@ class FFmpegController {
       this.probeDuration(audioPath),
     ]);
 
-    const trimSec = Math.max(0, audioDuration - videoDuration);
-    console.log(`[FFmpeg Merge] videoDuration=${videoDuration.toFixed(3)}s, audioDuration=${audioDuration.toFixed(3)}s, trimming ${trimSec.toFixed(3)}s from audio`);
+    const correctionSec = getAudioDelayMs() / 1000;
+    const rawTrimSec = audioDuration - videoDuration + correctionSec;
+    console.log(`[FFmpeg Merge] videoDuration=${videoDuration.toFixed(3)}s, audioDuration=${audioDuration.toFixed(3)}s, correction=${correctionSec.toFixed(3)}s, rawTrim=${rawTrimSec.toFixed(3)}s`);
 
     return new Promise((resolve, reject) => {
-      const trimFilter = trimSec > 0.05
-        ? ['-af', `atrim=start=${trimSec.toFixed(3)},asetpts=PTS-STARTPTS`]
-        : [];
+      let audioFilter: string[];
+      if (rawTrimSec > 0.05) {
+        // Trim from start of audio (audio is too long / needs to be delayed)
+        audioFilter = ['-af', `atrim=start=${rawTrimSec.toFixed(3)},asetpts=PTS-STARTPTS`];
+      } else if (rawTrimSec < -0.05) {
+        // Pad silence at start of audio (audio needs to be advanced / starts too late)
+        const delayMs = Math.round(Math.abs(rawTrimSec) * 1000);
+        audioFilter = ['-af', `adelay=${delayMs}|${delayMs}`];
+      } else {
+        audioFilter = [];
+      }
 
       const args = [
         '-i', videoPath,
         '-i', audioPath,
         '-c:v', 'copy',
         '-c:a', 'aac', '-b:a', '192k',
-        ...trimFilter,
+        ...audioFilter,
         '-map', '0:v:0',
         '-map', '1:a:0',
         '-movflags', '+faststart',
