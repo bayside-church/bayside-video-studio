@@ -28,8 +28,22 @@ npm run test:e2e     # Run Playwright E2E tests
 
 ## Production
 
+A pre-built, signed DMG is available on the [Releases](https://github.com/bayside-church/bayside-video-studio/releases) page.
+
+### Building from source
+
+The DMG is code-signed and notarized with a Developer ID certificate. To build a signed release yourself, you'll need an Apple Developer account with a **Developer ID Application** certificate installed in your keychain.
+
 ```bash
-npm run make         # Build macOS DMG
+APPLE_ID="your@appleid.com" APPLE_ID_PASSWORD="app-specific-password" npm run make
+```
+
+The `APPLE_ID_PASSWORD` should be an [app-specific password](https://support.apple.com/en-us/102654), not your Apple ID password. The built DMG will be in `out/make/`.
+
+To build unsigned (for local testing only):
+
+```bash
+npm run make
 ```
 
 The app runs in kiosk/fullscreen mode in production. To auto-start on boot:
