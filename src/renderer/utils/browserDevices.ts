@@ -86,11 +86,12 @@ function fuzzyMatch(ffmpegName: string, browserLabels: string[]): boolean {
  * Cross-references against browser enumerateDevices() labels.
  */
 export async function filterConnectedVideoDevices(devices: VideoDevice[]): Promise<VideoDevice[]> {
-  const { video: connectedLabels } = await getConnectedDeviceLabels();
-  if (connectedLabels.length === 0) return devices; // Can't filter without labels
+  const { video: connectedVideo, audio: connectedAudio } = await getConnectedDeviceLabels();
+  if (connectedVideo.length === 0) return devices; // Can't filter without labels
   return devices.filter((d) => {
     if (d.format === 'browser') return true; // Browser devices are already verified
-    return fuzzyMatch(d.name, connectedLabels);
+    if (d.format === 'decklink') return fuzzyMatch(d.name, connectedAudio); // DeckLink exposes audio but not video in browser
+    return fuzzyMatch(d.name, connectedVideo);
   });
 }
 
