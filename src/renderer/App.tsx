@@ -4,9 +4,7 @@ import { useSessionStore } from './store/useSessionStore';
 import { useAutoReset } from './hooks/useAutoReset';
 import { useIdleTimeout } from './hooks/useIdleTimeout';
 
-import WelcomeScreen from './screens/WelcomeScreen';
-import EmailScreen from './screens/EmailScreen';
-import PreRecordScreen from './screens/PreRecordScreen';
+import HomeScreen from './screens/HomeScreen';
 import CountdownScreen from './screens/CountdownScreen';
 import RecordingScreen from './screens/RecordingScreen';
 import ProcessingScreen from './screens/ProcessingScreen';
@@ -17,9 +15,7 @@ import UnavailableScreen from './screens/UnavailableScreen';
 import type { Screen } from '../shared/types';
 
 const screenMap: Record<Screen, React.ComponentType> = {
-  welcome: WelcomeScreen,
-  email: EmailScreen,
-  preRecord: PreRecordScreen,
+  home: HomeScreen,
   countdown: CountdownScreen,
   recording: RecordingScreen,
   processing: ProcessingScreen,
@@ -35,7 +31,6 @@ export default function App() {
   useAutoReset();
   useIdleTimeout();
 
-  // Listen for errors from main process
   useEffect(() => {
     const cleanup = window.baysideAPI.onError((error) => {
       setError(error);
@@ -43,10 +38,10 @@ export default function App() {
     return cleanup;
   }, [setError]);
 
-  const ScreenComponent = screenMap[screen] ?? WelcomeScreen;
+  const ScreenComponent = screenMap[screen] ?? HomeScreen;
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-bayside-dark">
+    <div className="h-screen w-screen overflow-hidden bg-surface-base font-sans">
       <AnimatePresence mode="wait">
         <ScreenComponent key={screen} />
       </AnimatePresence>

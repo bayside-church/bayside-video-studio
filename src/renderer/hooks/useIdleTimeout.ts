@@ -1,22 +1,27 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useSessionStore } from '../store/useSessionStore';
-import { IDLE_TIMEOUT_MS } from '../../shared/constants';
 
 export function useIdleTimeout() {
   const screen = useSessionStore((s) => s.screen);
   const reset = useSessionStore((s) => s.reset);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [timeoutMs, setTimeoutMs] = useState(120_000);
+
+  useEffect(() => {
+    window.baysideAPI.getIdleTimeoutSeconds().then((s) => setTimeoutMs(s * 1000));
+  }, []);
 
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
 
     // Don't run idle timeout on non-interactive screens
     if (
-      screen === 'welcome' ||
+      screen === 'home' ||
       screen === 'processing' ||
       screen === 'complete' ||
       screen === 'recording' ||
-      screen === 'countdown'
+      screen === 'countdown' ||
+      screen === 'unavailable'
     ) return;
 
     timerRef.current = setTimeout(async () => {
@@ -27,8 +32,8 @@ export function useIdleTimeout() {
         console.warn('[Idle] resetSession failed:', err);
       }
       reset();
-    }, IDLE_TIMEOUT_MS);
-  }, [screen, reset]);
+    }, timeoutMs);
+  }, [screen, reset, timeoutMs]);
 
   useEffect(() => {
     resetTimer();

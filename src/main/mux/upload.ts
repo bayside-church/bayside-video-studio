@@ -1,68 +1,94 @@
-import * as tus from 'tus-js-client';
 import fs from 'fs';
+import https from 'https';
 import { BrowserWindow } from 'electron';
 import { UPLOAD_CHUNK_SIZE } from '../../shared/constants';
+import { getTestMode } from '../settings';
 import { getMux } from './client';
 
 export async function createUploadAndSend(
   filePath: string,
   window: BrowserWindow,
+  email: string,
 ): Promise<string> {
   // Create a direct upload on Mux
   const upload = await getMux().video.uploads.create({
     cors_origin: 'http://localhost',
+    ...(getTestMode() && { test: true }),
     new_asset_settings: {
       playback_policy: ['public'],
-      encoding_tier: 'baseline',
+      video_quality: 'premium',
+      max_resolution_tier: '2160p',
+      master_access: 'temporary',
+      passthrough: email,
     },
   });
 
   const uploadUrl = upload.url;
   if (!uploadUrl) throw new Error('Mux did not return an upload URL');
 
-  // Upload via tus
-  await tusUpload(filePath, uploadUrl, window);
+  // Upload via PUT
+  await putUpload(filePath, uploadUrl, window);
 
   return upload.id;
 }
 
-function tusUpload(
+function putUpload(
   filePath: string,
   uploadUrl: string,
   window: BrowserWindow,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const fileStream = fs.createReadStream(filePath);
     const fileSize = fs.statSync(filePath).size;
+    const url = new URL(uploadUrl);
 
-    const upload = new tus.Upload(fileStream as unknown as tus.Upload['file'], {
-      endpoint: uploadUrl,
-      uploadUrl: uploadUrl,
-      chunkSize: UPLOAD_CHUNK_SIZE,
-      retryDelays: [0, 1000, 3000, 5000, 10000],
-      uploadSize: fileSize,
-      metadata: {
-        filename: filePath.split('/').pop() ?? 'recording.mp4',
-        filetype: 'video/mp4',
+    const req = https.request(
+      {
+        hostname: url.hostname,
+        path: url.pathname + url.search,
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': fileSize,
+        },
       },
-      onProgress: (bytesUploaded: number, bytesTotal: number) => {
-        const percent = Math.round((bytesUploaded / bytesTotal) * 100);
-        window.webContents.send('bayside:upload-progress', {
-          percent,
-          bytesUploaded,
-          bytesTotal,
-        });
+      (res) => {
+        if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+          console.log('[Mux] Upload complete');
+          resolve();
+        } else {
+          let body = '';
+          res.on('data', (chunk) => (body += chunk));
+          res.on('end', () => {
+            reject(
+              new Error(
+                `Upload failed with status ${res.statusCode}: ${body}`,
+              ),
+            );
+          });
+        }
       },
-      onSuccess: () => {
-        console.log('[Mux] Upload complete');
-        resolve();
-      },
-      onError: (err: Error) => {
-        console.error('[Mux] Upload error:', err.message);
-        reject(err);
-      },
+    );
+
+    req.on('error', (err) => {
+      console.error('[Mux] Upload error:', err.message);
+      reject(err);
     });
 
-    upload.start();
+    const fileStream = fs.createReadStream(filePath, {
+      highWaterMark: UPLOAD_CHUNK_SIZE,
+    });
+
+    let bytesUploaded = 0;
+    fileStream.on('data', (chunk: Buffer) => {
+      bytesUploaded += chunk.length;
+      const percent = Math.round((bytesUploaded / fileSize) * 100);
+      window.webContents.send('bayside:upload-progress', {
+        percent,
+        bytesUploaded,
+        bytesTotal: fileSize,
+      });
+    });
+
+    fileStream.pipe(req);
   });
 }

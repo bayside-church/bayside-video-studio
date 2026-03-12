@@ -1,11 +1,13 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { VitePlugin } from '@electron-forge/plugin-vite';
+import path from 'path';
 
 const config: ForgeConfig = {
   packagerConfig: {
     name: 'Bayside Video Studio',
     icon: './assets/icon',
     asar: true,
+    extraResource: [path.resolve(__dirname, 'resources', 'ffmpeg')],
   },
   makers: [
     {

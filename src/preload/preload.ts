@@ -1,16 +1,51 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { BaysideAPI, PreviewFrame, UploadProgress } from '../shared/types';
+import type { BaysideAPI, PreviewFrame, UploadProgress, VideoDevice, AudioDevice, GuideSettings, AdminSettings } from '../shared/types';
 
 const api: BaysideAPI = {
   detectDevice: () => ipcRenderer.invoke('bayside:detect-device'),
   startPreview: () => ipcRenderer.invoke('bayside:start-preview'),
   stopPreview: () => ipcRenderer.invoke('bayside:stop-preview'),
-  startRecording: () => ipcRenderer.invoke('bayside:start-recording'),
-  stopRecording: () => ipcRenderer.invoke('bayside:stop-recording'),
-  uploadVideo: (filePath: string) => ipcRenderer.invoke('bayside:upload-video', filePath),
-  sendEmail: (email: string, playbackUrl: string) =>
-    ipcRenderer.invoke('bayside:send-email', email, playbackUrl),
+  usesFFmpegAudio: () => ipcRenderer.invoke('bayside:uses-ffmpeg-audio'),
+  startRecording: (email?: string) => ipcRenderer.invoke('bayside:start-recording', email),
+  stopRecording: (rendererAudioPath?: string) =>
+    ipcRenderer.invoke('bayside:stop-recording', rendererAudioPath),
+  uploadVideo: (filePath: string, email: string) =>
+    ipcRenderer.invoke('bayside:upload-video', filePath, email),
+  listAssets: (page?: number) => ipcRenderer.invoke('bayside:list-assets', page),
+  resendDownload: (assetId: string, email: string) =>
+    ipcRenderer.invoke('bayside:resend-download', assetId, email),
+  saveBrowserRecording: (buffer: ArrayBuffer, email?: string) =>
+    ipcRenderer.invoke('bayside:save-browser-recording', buffer, email),
+  saveAudioRecording: (buffer: ArrayBuffer) =>
+    ipcRenderer.invoke('bayside:save-audio-recording', buffer),
   resetSession: () => ipcRenderer.invoke('bayside:reset-session'),
+
+  // Admin
+  getTestMode: () => ipcRenderer.invoke('bayside:get-test-mode'),
+  setTestMode: (enabled: boolean) => ipcRenderer.invoke('bayside:set-test-mode', enabled),
+  verifyAdminPin: (pin: string) => ipcRenderer.invoke('bayside:verify-admin-pin', pin),
+  setAdminPin: (pin: string) => ipcRenderer.invoke('bayside:set-admin-pin', pin),
+  getGuides: () => ipcRenderer.invoke('bayside:get-guides'),
+  setGuides: (guides: GuideSettings) => ipcRenderer.invoke('bayside:set-guides', guides),
+  getStorageDir: () => ipcRenderer.invoke('bayside:get-storage-dir'),
+  setStorageDir: (dir: string) => ipcRenderer.invoke('bayside:set-storage-dir', dir),
+  browseStorageDir: () => ipcRenderer.invoke('bayside:browse-storage-dir'),
+  getAutoDelete: () => ipcRenderer.invoke('bayside:get-auto-delete'),
+  setAutoDelete: (enabled: boolean) => ipcRenderer.invoke('bayside:set-auto-delete', enabled),
+  getAdminSettings: () => ipcRenderer.invoke('bayside:get-admin-settings'),
+  setAdminSettings: (settings: Partial<AdminSettings>) => ipcRenderer.invoke('bayside:set-admin-settings', settings),
+  getMaxRecordingSeconds: () => ipcRenderer.invoke('bayside:get-max-recording-seconds'),
+  getIdleTimeoutSeconds: () => ipcRenderer.invoke('bayside:get-idle-timeout-seconds'),
+  getMissingSettings: () => ipcRenderer.invoke('bayside:get-missing-settings'),
+
+  // Device management
+  listDevices: () => ipcRenderer.invoke('bayside:list-devices'),
+  getSelectedDevice: () => ipcRenderer.invoke('bayside:get-selected-device'),
+  selectDevice: (device: VideoDevice) => ipcRenderer.invoke('bayside:select-device', device),
+  probeVideoDevice: (deviceId: string) => ipcRenderer.invoke('bayside:probe-video-device', deviceId),
+  listAudioDevices: () => ipcRenderer.invoke('bayside:list-audio-devices'),
+  getSelectedAudioDevice: () => ipcRenderer.invoke('bayside:get-selected-audio-device'),
+  selectAudioDevice: (device: AudioDevice | null) => ipcRenderer.invoke('bayside:select-audio-device', device),
 
   onPreviewFrame: (callback: (frame: PreviewFrame) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, frame: PreviewFrame) => callback(frame);

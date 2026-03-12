@@ -8,10 +8,22 @@ interface BigButtonProps {
   pulse?: boolean;
 }
 
-const variants = {
-  primary: 'bg-blue-500 hover:bg-blue-400 text-white shadow-lg shadow-blue-500/25',
-  danger: 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/25',
-  ghost: 'bg-white/10 hover:bg-white/20 text-white border border-white/20',
+const variantStyles = {
+  primary: `
+    bg-accent text-white
+    shadow-[0_1px_2px_rgba(0,0,0,0.3),0_0_0_1px_rgba(129,140,248,0.4),0_8px_24px_-4px_rgba(129,140,248,0.2)]
+    hover:bg-accent-hover hover:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_0_0_1px_rgba(165,180,252,0.5),0_12px_32px_-4px_rgba(129,140,248,0.3)]
+  `,
+  danger: `
+    bg-danger text-white
+    shadow-[0_1px_2px_rgba(0,0,0,0.3),0_0_0_1px_rgba(248,113,113,0.4),0_8px_24px_-4px_rgba(248,113,113,0.2)]
+    hover:bg-danger-hover hover:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_0_0_1px_rgba(252,165,165,0.5),0_12px_32px_-4px_rgba(248,113,113,0.3)]
+  `,
+  ghost: `
+    bg-surface-overlay text-text-primary
+    shadow-[0_1px_2px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.08)]
+    hover:bg-surface-border-hover hover:shadow-[0_1px_2px_rgba(0,0,0,0.2),0_0_0_1px_rgba(255,255,255,0.14)]
+  `,
 };
 
 export default function BigButton({
@@ -27,14 +39,15 @@ export default function BigButton({
       onClick={onClick}
       disabled={disabled}
       className={`
-        px-12 py-5 rounded-2xl text-2xl font-semibold
-        transition-colors duration-200
-        disabled:opacity-40 disabled:cursor-not-allowed
-        ${variants[variant]}
+        px-10 py-4 rounded-2xl text-lg font-semibold tracking-[-0.01em]
+        transition-all duration-200 cursor-pointer
+        disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none
+        ${variantStyles[variant]}
       `}
-      whileTap={{ scale: 0.95 }}
-      animate={pulse ? { scale: [1, 1.05, 1] } : undefined}
-      transition={pulse ? { repeat: Infinity, duration: 2, ease: 'easeInOut' } : undefined}
+      whileHover={disabled ? undefined : { y: -1 }}
+      whileTap={disabled ? undefined : { scale: 0.97, y: 0 }}
+      animate={pulse ? { scale: [1, 1.03, 1] } : undefined}
+      transition={pulse ? { repeat: Infinity, duration: 2.5, ease: 'easeInOut' } : undefined}
     >
       {children}
     </motion.button>

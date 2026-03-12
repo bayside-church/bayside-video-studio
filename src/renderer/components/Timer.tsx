@@ -17,10 +17,10 @@ export default function Timer() {
   const display = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
   return (
-    <div className="flex items-center gap-3 text-white text-2xl font-mono">
-      <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse" />
-      <span>REC</span>
-      <span className="tabular-nums">{display}</span>
+    <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-black/60 backdrop-blur-sm shadow-[0_0_0_1px_rgba(255,255,255,0.06)]">
+      <div className="w-2.5 h-2.5 bg-danger rounded-full animate-pulse" />
+      <span className="text-danger text-sm font-semibold tracking-wide uppercase">Rec</span>
+      <span className="text-text-primary text-sm font-mono font-medium tabular-nums tracking-wider">{display}</span>
     </div>
   );
 }

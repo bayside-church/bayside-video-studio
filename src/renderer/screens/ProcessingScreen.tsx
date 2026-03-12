@@ -9,7 +9,6 @@ export default function ProcessingScreen() {
     email,
     uploadProgress,
     setUploadProgress,
-    setPlaybackUrl,
     setScreen,
     setError,
   } = useSessionStore();
@@ -27,17 +26,7 @@ export default function ProcessingScreen() {
 
     (async () => {
       try {
-        const playbackUrl = await window.baysideAPI.uploadVideo(filePath);
-        if (cancelled) return;
-        setPlaybackUrl(playbackUrl);
-
-        // Try to send email, but don't block on failure
-        try {
-          await window.baysideAPI.sendEmail(email, playbackUrl);
-        } catch (emailErr) {
-          console.error('Email send failed:', emailErr);
-        }
-
+        await window.baysideAPI.uploadVideo(filePath, email);
         if (!cancelled) {
           setScreen('complete');
         }
@@ -52,23 +41,35 @@ export default function ProcessingScreen() {
       cancelled = true;
       cleanupProgress();
     };
-  }, [filePath, email, setUploadProgress, setPlaybackUrl, setScreen, setError]);
+  }, [filePath, email, setUploadProgress, setScreen, setError]);
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="h-full flex flex-col items-center justify-center gap-10 bg-gradient-to-b from-bayside-navy to-bayside-dark"
+      transition={{ duration: 0.3 }}
+      className="screen-base gap-8"
     >
-      <div className="w-12 h-12 border-3 border-white/20 border-t-blue-400 rounded-full animate-spin" />
+      {/* Spinner */}
+      <motion.div
+        className="w-10 h-10 border-2 border-surface-border border-t-accent rounded-full relative z-10"
+        animate={{ rotate: 360 }}
+        transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+      />
 
-      <div className="text-center">
-        <h2 className="text-4xl font-bold text-white mb-3">Processing Your Video</h2>
-        <p className="text-xl text-white/50">This will just take a moment...</p>
+      <div className="text-center relative z-10">
+        <h2 className="text-2xl font-bold text-text-primary tracking-[-0.02em] mb-2">
+          Preparing your video
+        </h2>
+        <p className="text-base text-text-secondary">
+          We'll email it to you shortly
+        </p>
       </div>
 
-      <ProgressBar percent={uploadProgress} />
+      <div className="relative z-10 w-full flex justify-center px-8">
+        <ProgressBar percent={uploadProgress} />
+      </div>
     </motion.div>
   );
 }

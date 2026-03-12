@@ -1,67 +1,174 @@
 import { execFile } from 'child_process';
-import { isDev } from '../config';
+import { getFFmpegPath, hasDeckLinkSupport } from './binary';
+import type { VideoDevice, AudioDevice } from '../../shared/types';
 
 /**
- * Detect available DeckLink device name.
- * In dev mode, returns a webcam device identifier instead.
+ * List all available video capture devices (DeckLink + avfoundation).
  */
-export function detectDeckLinkDevice(): Promise<string | null> {
-  if (isDev) {
-    return detectWebcam();
-  }
+export async function listAllDevices(): Promise<VideoDevice[]> {
+  const ffmpeg = getFFmpegPath();
+  const decklink = hasDeckLinkSupport()
+    ? await listDeckLinkDevices(ffmpeg)
+    : [];
+  const avfoundation = await listAvFoundationDevices(ffmpeg);
+  console.log(`[Devices] Found ${decklink.length} DeckLink + ${avfoundation.length} AVFoundation video devices`);
+  return [...decklink, ...avfoundation];
+}
 
+/**
+ * List all available audio input devices (avfoundation only).
+ */
+export async function listAllAudioDevices(): Promise<AudioDevice[]> {
+  const ffmpeg = getFFmpegPath();
+  return listAvFoundationAudioDevices(ffmpeg);
+}
+
+function listDeckLinkDevices(ffmpeg: string): Promise<VideoDevice[]> {
   return new Promise((resolve) => {
     const proc = execFile(
-      'ffmpeg',
+      ffmpeg,
       ['-f', 'decklink', '-list_devices', '1', '-i', 'dummy'],
       { timeout: 10_000 },
       (_error, _stdout, stderr) => {
-        // FFmpeg outputs device list to stderr
         const output = stderr ?? '';
-        const lines = output.split('\n');
+        console.log('[DeckLink] Raw device output:\n', output);
+        const devices: VideoDevice[] = [];
+        let deviceIndex = 0;
 
-        for (const line of lines) {
-          // Look for lines like: [decklink @ 0x...] [0] DeckLink Mini Recorder
-          const match = line.match(/\[\d+\]\s+(.+)/);
-          if (match && !line.includes('Could not')) {
-            const deviceName = match[1].trim();
-            if (deviceName && !deviceName.startsWith('[')) {
-              console.log(`[DeckLink] Found device: ${deviceName}`);
-              resolve(deviceName);
-              return;
+        for (const line of output.split('\n')) {
+          // Old format: [0] UltraStudio 4K Mini
+          const indexMatch = line.match(/\[(\d+)\]\s+(.+)/);
+          if (indexMatch && !line.includes('Could not')) {
+            const name = indexMatch[2].trim().replace(/^'|'$/g, '');
+            if (name && !name.startsWith('[')) {
+              devices.push({
+                id: `decklink:${indexMatch[1]}`,
+                name,
+                format: 'decklink',
+              });
+              continue;
+            }
+          }
+
+          // New format (FFmpeg 7+): quoted name, possibly with log prefix
+          // e.g. [in#0 @ 0x...] \t'UltraStudio 4K Mini'
+          const quotedMatch = line.match(/'([^']+)'/);
+          if (quotedMatch && !line.includes('DeckLink input devices') && !line.includes('Could not') && !line.includes('option is deprecated') && !line.includes('drivers are too old')) {
+            const name = quotedMatch[1].trim();
+            if (name) {
+              devices.push({
+                id: `decklink:${deviceIndex}`,
+                name,
+                format: 'decklink',
+              });
+              deviceIndex++;
             }
           }
         }
 
-        console.warn('[DeckLink] No device found');
-        resolve(null);
+        resolve(devices);
       },
     );
 
-    proc.on('error', () => {
-      console.error('[DeckLink] FFmpeg not found');
-      resolve(null);
+    proc.on('error', (err) => {
+      console.warn('[DeckLink] Failed to list devices:', err.message);
+      resolve([]);
     });
   });
 }
 
-function detectWebcam(): Promise<string | null> {
+function listAvFoundationDevices(ffmpeg: string): Promise<VideoDevice[]> {
   return new Promise((resolve) => {
     const proc = execFile(
-      'ffmpeg',
+      ffmpeg,
       ['-f', 'avfoundation', '-list_devices', 'true', '-i', ''],
       { timeout: 10_000 },
       (_error, _stdout, stderr) => {
         const output = stderr ?? '';
-        if (output.includes('[0]') || output.includes('video')) {
-          console.log('[Dev] Using webcam device 0');
-          resolve('0');
-          return;
+        console.log('[AVFoundation] Raw device output:\n', output);
+        const devices: VideoDevice[] = [];
+        let inVideoSection = false;
+
+        for (const line of output.split('\n')) {
+          // Detect start of video devices section
+          if (line.includes('AVFoundation video devices')) {
+            inVideoSection = true;
+            continue;
+          }
+          // Detect start of audio devices section (end of video)
+          if (line.includes('AVFoundation audio devices')) {
+            break;
+          }
+
+          if (inVideoSection) {
+            // Match lines like: [AVFoundation indev @ 0x...] [0] FaceTime HD Camera
+            const match = line.match(/\[(\d+)\]\s+(.+)/);
+            if (match) {
+              const idx = match[1];
+              const name = match[2].trim();
+              // Skip screen capture and Continuity Camera (iPhone/iPad) devices
+              if (/capture screen/i.test(name)) continue;
+              if (/iphone|ipad/i.test(name)) continue;
+              devices.push({
+                id: `avfoundation:${idx}`,
+                name,
+                format: 'avfoundation',
+              });
+            }
+          }
         }
-        resolve(null);
+
+        resolve(devices);
       },
     );
 
-    proc.on('error', () => resolve(null));
+    proc.on('error', (err) => {
+      console.warn('[AVFoundation] Failed to list devices:', err.message);
+      resolve([]);
+    });
+  });
+}
+
+function listAvFoundationAudioDevices(ffmpeg: string): Promise<AudioDevice[]> {
+  return new Promise((resolve) => {
+    const proc = execFile(
+      ffmpeg,
+      ['-f', 'avfoundation', '-list_devices', 'true', '-i', ''],
+      { timeout: 10_000 },
+      (_error, _stdout, stderr) => {
+        const output = stderr ?? '';
+        const devices: AudioDevice[] = [];
+        let inAudioSection = false;
+
+        for (const line of output.split('\n')) {
+          if (line.includes('AVFoundation audio devices')) {
+            inAudioSection = true;
+            continue;
+          }
+
+          if (inAudioSection) {
+            const match = line.match(/\[(\d+)\]\s+(.+)/);
+            if (match) {
+              const idx = match[1];
+              const name = match[2].trim();
+              // Skip Continuity Camera (iPhone/iPad) audio devices
+              if (/iphone|ipad/i.test(name)) continue;
+              devices.push({
+                id: `avfoundation:${idx}`,
+                name,
+                format: 'avfoundation',
+              });
+            }
+          }
+        }
+
+        resolve(devices);
+      },
+    );
+
+    proc.on('error', (err) => {
+      console.warn('[AVFoundation] Failed to list audio devices:', err.message);
+      resolve([]);
+    });
   });
 }

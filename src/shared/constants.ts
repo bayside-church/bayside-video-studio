@@ -1,6 +1,6 @@
 export const MAX_RECORDING_SECONDS = 120;
 export const IDLE_TIMEOUT_MS = 120_000;
-export const AUTO_RESET_MS = 10_000;
+export const AUTO_RESET_MS = 120_000;
 export const COUNTDOWN_SECONDS = 3;
 export const DEVICE_RETRY_INTERVAL_MS = 10_000;
 export const MUX_POLL_INTERVAL_MS = 3_000;
@@ -8,6 +8,6 @@ export const MUX_POLL_TIMEOUT_MS = 120_000;
 export const UPLOAD_CHUNK_SIZE = 50 * 1024 * 1024; // 50MB
 export const UPLOAD_MAX_RETRIES = 3;
 export const FFMPEG_STOP_TIMEOUT_MS = 5_000;
-export const PREVIEW_FPS = 15;
-export const PREVIEW_WIDTH = 960;
-export const PREVIEW_HEIGHT = 540;
+export const PREVIEW_FPS = 30;
+export const PREVIEW_WIDTH = 1280;
+export const PREVIEW_HEIGHT = 720;

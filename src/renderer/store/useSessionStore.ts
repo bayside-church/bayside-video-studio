@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Screen } from '../../shared/types';
+import type { Screen, GuideSettings } from '../../shared/types';
 
 interface SessionStore {
   screen: Screen;
@@ -8,6 +8,8 @@ interface SessionStore {
   uploadProgress: number;
   playbackUrl: string | null;
   errorMessage: string | null;
+  guides: GuideSettings;
+  isBrowserCapture: boolean;
 
   setScreen: (screen: Screen) => void;
   setEmail: (email: string) => void;
@@ -15,16 +17,20 @@ interface SessionStore {
   setUploadProgress: (progress: number) => void;
   setPlaybackUrl: (url: string) => void;
   setError: (message: string) => void;
+  setGuides: (guides: GuideSettings) => void;
+  setIsBrowserCapture: (v: boolean) => void;
   reset: () => void;
 }
 
 const initialState = {
-  screen: 'welcome' as Screen,
+  screen: 'home' as Screen,
   email: '',
   filePath: null as string | null,
   uploadProgress: 0,
   playbackUrl: null as string | null,
   errorMessage: null as string | null,
+  guides: { ruleOfThirds: true, centerCrosshair: true, safeZones: false } as GuideSettings,
+  isBrowserCapture: false,
 };
 
 export const useSessionStore = create<SessionStore>((set) => ({
@@ -35,5 +41,7 @@ export const useSessionStore = create<SessionStore>((set) => ({
   setUploadProgress: (uploadProgress) => set({ uploadProgress }),
   setPlaybackUrl: (playbackUrl) => set({ playbackUrl }),
   setError: (errorMessage) => set({ errorMessage, screen: 'error' }),
+  setGuides: (guides) => set({ guides }),
+  setIsBrowserCapture: (isBrowserCapture) => set({ isBrowserCapture }),
   reset: () => set({ ...initialState }),
 }));

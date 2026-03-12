@@ -1,11 +1,19 @@
 import Mux from '@mux/mux-node';
-import { MUX_TOKEN_ID, MUX_TOKEN_SECRET } from '../config';
+import { getMuxTokenId, getMuxTokenSecret } from '../settings';
 
 let mux: Mux | null = null;
+let lastTokenId = '';
+let lastTokenSecret = '';
 
 export function getMux() {
-  if (!mux) {
-    mux = new Mux({ tokenId: MUX_TOKEN_ID, tokenSecret: MUX_TOKEN_SECRET });
+  const tokenId = getMuxTokenId();
+  const tokenSecret = getMuxTokenSecret();
+
+  // Recreate client if credentials changed
+  if (!mux || tokenId !== lastTokenId || tokenSecret !== lastTokenSecret) {
+    mux = new Mux({ tokenId, tokenSecret });
+    lastTokenId = tokenId;
+    lastTokenSecret = tokenSecret;
   }
   return mux;
 }

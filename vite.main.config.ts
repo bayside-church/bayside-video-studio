@@ -1,13 +1,12 @@
 import { defineConfig } from 'vite';
 import { builtinModules } from 'module';
-import pkg from './package.json';
 
-// Externalize all Node.js built-ins, electron, and all dependencies
+// Only externalize electron and Node.js built-ins.
+// All npm dependencies get bundled by Vite so they're available inside the asar.
 const externals = [
   'electron',
   ...builtinModules,
   ...builtinModules.map((m) => `node:${m}`),
-  ...Object.keys(pkg.dependencies ?? {}),
 ];
 
 export default defineConfig({

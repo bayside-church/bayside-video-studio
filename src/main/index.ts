@@ -2,7 +2,9 @@ import { app, BrowserWindow, session } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { registerIpcHandlers } from './ipc/handlers';
-import { isDev, RECORDINGS_DIR } from './config';
+import { ffmpegController } from './ffmpeg/controller';
+import { isDev, getRecordingsDir } from './config';
+import { getAutoDeleteOnUpload } from './settings';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -11,12 +13,14 @@ let mainWindow: BrowserWindow | null = null;
 
 // Clean up stale recordings from previous sessions
 function cleanupStaleRecordings() {
+  if (!getAutoDeleteOnUpload()) return; // User manages deletion manually
   try {
-    if (!fs.existsSync(RECORDINGS_DIR)) return;
-    const files = fs.readdirSync(RECORDINGS_DIR);
+    const dir = getRecordingsDir();
+    if (!fs.existsSync(dir)) return;
+    const files = fs.readdirSync(dir);
     const oneHourAgo = Date.now() - 60 * 60 * 1000;
     for (const file of files) {
-      const filePath = path.join(RECORDINGS_DIR, file);
+      const filePath = path.join(dir, file);
       const stat = fs.statSync(filePath);
       if (stat.mtimeMs < oneHourAgo) {
         fs.unlinkSync(filePath);
@@ -38,11 +42,15 @@ app.whenReady().then(() => {
         responseHeaders: {
           ...details.responseHeaders,
           'Content-Security-Policy': [
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com",
           ],
         },
       });
     });
+  }
+
+  if (isDev && app.dock) {
+    app.dock.setIcon(path.join(app.getAppPath(), 'assets', 'icon.png'));
   }
 
   mainWindow = new BrowserWindow({
@@ -72,5 +80,5 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  app.quit();
+  ffmpegController.killAll().finally(() => app.quit());
 });
