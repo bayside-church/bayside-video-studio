@@ -1017,6 +1017,19 @@ function AzureVideosPanel() {
                     {pv.progress}%
                   </span>
                 )}
+                {pv.status === 'failed' && (
+                  <button
+                    className="text-[10px] text-accent hover:text-accent/80 ml-2 flex-shrink-0 transition-colors"
+                    onClick={() => {
+                      useSessionStore.getState().retryPendingVideo(pv.id);
+                      window.baysideAPI.uploadVideo(pv.id, pv.email).catch((err: unknown) => {
+                        console.error('[Retry] Upload failed:', err);
+                      });
+                    }}
+                  >
+                    Retry
+                  </button>
+                )}
               </div>
               {pv.email && (
                 <p className="text-[11px] text-text-tertiary mt-0.5 truncate pl-[22px]">{pv.email}</p>

@@ -21,6 +21,7 @@ interface SessionStore {
   addPendingVideo: (video: PendingVideo) => void;
   updatePendingVideoProgress: (id: string, progress: number) => void;
   completePendingVideo: (id: string, status: 'complete' | 'failed') => void;
+  retryPendingVideo: (id: string) => void;
   removePendingVideo: (id: string) => void;
   reset: () => void;
 }
@@ -56,6 +57,11 @@ export const useSessionStore = create<SessionStore>((set) => ({
   completePendingVideo: (id, status) => set((state) => ({
     pendingVideos: state.pendingVideos.map((v) =>
       v.id === id ? { ...v, status, progress: status === 'complete' ? 100 : v.progress } : v
+    ),
+  })),
+  retryPendingVideo: (id) => set((state) => ({
+    pendingVideos: state.pendingVideos.map((v) =>
+      v.id === id ? { ...v, status: 'uploading' as const, progress: 0 } : v
     ),
   })),
   removePendingVideo: (id) => set((state) => ({
