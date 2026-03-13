@@ -181,8 +181,11 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     return await ffmpegController.stopRecording(rendererAudioPath);
   });
 
-  // Dedup guard: prevent duplicate uploads for the same file
-  let activeUploadPath: string | null = null;
+  // Track active uploads by resolved file path to prevent duplicate uploads of the same file
+  const activeUploads = new Set<string>();
+
+  // Serialize GIF generation to avoid spawning too many concurrent FFmpeg processes
+  let gifQueue: Promise<void> = Promise.resolve();
 
   ipcMain.handle('bayside:upload-video', async (_event, filePath: string, email: string) => {
     const win = getWindow();
@@ -194,34 +197,43 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
       throw new Error('Invalid file path');
     }
 
-    // Skip if already uploading this file
-    if (activeUploadPath === resolved) return;
-    activeUploadPath = resolved;
+    // Skip if already uploading this exact file
+    if (activeUploads.has(resolved)) return;
+    activeUploads.add(resolved);
 
-    // Generate GIF preview from the local video before upload/deletion
+    // Use the filePath as the uploadId — it's already the pending video's id in the renderer
+    const uploadId = filePath;
+
+    // Generate GIF preview sequentially (queued) to limit FFmpeg concurrency
     let gifPath: string | null = null;
-    try {
-      gifPath = await generateGif(filePath);
-    } catch (err) {
-      console.warn(`[GIF] Generation failed, email will be sent without preview: ${err}`);
-    }
+    gifQueue = gifQueue.then(async () => {
+      try {
+        gifPath = await generateGif(filePath);
+      } catch (err) {
+        console.warn(`[GIF] Generation failed, email will be sent without preview: ${err}`);
+      }
+    });
+    await gifQueue;
 
     // Fire-and-forget: upload to Azure, then send email with Azure URL
     (async () => {
+      let success = false;
       try {
-        const azureUrl = await uploadToAzureBlob(filePath, email, win, gifPath);
+        const azureUrl = await uploadToAzureBlob(filePath, email, win, gifPath, uploadId);
         await sendPlaybackEmail(email, azureUrl, gifPath);
         console.log(`[Email] Sent Azure download link to ${email}`);
-        win.webContents.send('bayside:upload-complete', { success: true });
+        success = true;
+        win.webContents.send('bayside:upload-complete', { uploadId, success: true });
       } catch (err) {
         console.error(`[Background] Azure upload or email failed: ${err}`);
-        win.webContents.send('bayside:upload-complete', { success: false, error: String(err) });
+        win.webContents.send('bayside:upload-complete', { uploadId, success: false, error: String(err) });
       } finally {
-        if (getAutoDeleteOnUpload()) {
+        activeUploads.delete(resolved);
+        // Only delete local files after a successful upload
+        if (success && getAutoDeleteOnUpload()) {
           deleteRecording(filePath);
         }
-        activeUploadPath = null;
-        // Clean up the GIF file after sending
+        // Clean up the GIF file after sending (or failure — GIF is just a temp preview)
         if (gifPath) {
           try { fs.unlinkSync(gifPath); } catch { /* ignore */ }
         }

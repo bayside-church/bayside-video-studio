@@ -40,21 +40,21 @@ export default function App() {
   useEffect(() => {
     const cleanupProgress = window.baysideAPI.onUploadProgress((progress) => {
       const store = useSessionStore.getState();
-      const uploading = store.pendingVideos.find((v) => v.status === 'uploading');
-      if (uploading) {
-        store.updatePendingVideoProgress(uploading.id, progress.percent);
+      const target = store.pendingVideos.find((v) => v.id === progress.uploadId);
+      if (target) {
+        store.updatePendingVideoProgress(target.id, progress.percent);
       }
     });
 
     const cleanupComplete = window.baysideAPI.onUploadComplete((data) => {
       const store = useSessionStore.getState();
-      const uploading = store.pendingVideos.find((v) => v.status === 'uploading');
-      if (uploading) {
-        store.completePendingVideo(uploading.id, data.success ? 'complete' : 'failed');
+      const target = store.pendingVideos.find((v) => v.id === data.uploadId);
+      if (target) {
+        store.completePendingVideo(target.id, data.success ? 'complete' : 'failed');
         if (data.success) {
           // Remove the pending entry after a short delay
           setTimeout(() => {
-            store.removePendingVideo(uploading.id);
+            store.removePendingVideo(target.id);
           }, 1500);
         }
       }

@@ -20,6 +20,7 @@ export interface PreviewFrame {
 }
 
 export interface UploadProgress {
+  uploadId: string;
   percent: number;
   bytesUploaded: number;
   bytesTotal: number;
@@ -108,7 +109,7 @@ export interface BaysideAPI {
   onPreviewFrame: (callback: (frame: PreviewFrame) => void) => () => void;
   onUploadProgress: (callback: (progress: UploadProgress) => void) => () => void;
   onError: (callback: (error: string) => void) => () => void;
-  onUploadComplete: (callback: (data: { success: boolean; error?: string }) => void) => () => void;
+  onUploadComplete: (callback: (data: { uploadId: string; success: boolean; error?: string }) => void) => () => void;
 
   // Browser capture
   saveBrowserRecording: (buffer: ArrayBuffer, email?: string) => Promise<string>;

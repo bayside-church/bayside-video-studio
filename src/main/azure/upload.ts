@@ -9,6 +9,7 @@ export async function uploadToAzureBlob(
   email: string,
   window: BrowserWindow,
   gifPath?: string | null,
+  uploadId?: string,
 ): Promise<string> {
   const containerClient = getContainerClient();
 
@@ -49,6 +50,7 @@ export async function uploadToAzureBlob(
     onProgress: (progress) => {
       const percent = fileSize > 0 ? Math.round((progress.loadedBytes / fileSize) * 100) : 0;
       window.webContents.send('bayside:upload-progress', {
+        uploadId: uploadId ?? '',
         percent,
         bytesUploaded: progress.loadedBytes,
         bytesTotal: fileSize,

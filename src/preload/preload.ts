@@ -82,8 +82,8 @@ const api: BaysideAPI = {
     return () => ipcRenderer.removeListener('bayside:error', handler);
   },
 
-  onUploadComplete: (callback: (data: { success: boolean; error?: string }) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, data: { success: boolean; error?: string }) => callback(data);
+  onUploadComplete: (callback: (data: { uploadId: string; success: boolean; error?: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: { uploadId: string; success: boolean; error?: string }) => callback(data);
     ipcRenderer.on('bayside:upload-complete', handler);
     return () => ipcRenderer.removeListener('bayside:upload-complete', handler);
   },

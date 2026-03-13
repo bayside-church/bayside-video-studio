@@ -13,6 +13,7 @@ const mockAPI: BaysideAPI = {
   resetSession: vi.fn().mockResolvedValue(undefined),
   onPreviewFrame: vi.fn().mockReturnValue(() => {}),
   onUploadProgress: vi.fn().mockReturnValue(() => {}),
+  onUploadComplete: vi.fn().mockReturnValue(() => {}),
   onError: vi.fn().mockReturnValue(() => {}),
 };
 
