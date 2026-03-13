@@ -44,3 +44,16 @@ export function getAzureDownloadUrl(blobName: string): string {
   return generateDownloadSasUrl(blobName, blobName);
 }
 
+/**
+ * Look up the GIF blob name from a video blob's metadata and return a SAS URL for it.
+ * Returns null if no GIF is associated with the blob.
+ */
+export async function getGifUrlForBlob(videoBlobName: string): Promise<string | null> {
+  const containerClient = getContainerClient();
+  const blobClient = containerClient.getBlobClient(videoBlobName);
+  const properties = await blobClient.getProperties();
+  const gifBlobName = properties.metadata?.gifblob;
+  if (!gifBlobName) return null;
+  return generateGifSasUrl(gifBlobName);
+}
+

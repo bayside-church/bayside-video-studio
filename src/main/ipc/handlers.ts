@@ -27,7 +27,7 @@ import { deleteRecording } from '../cleanup';
 import { getRecordingsDir, TEMP_FALLBACK_DIR } from '../config';
 import { DEFAULT_STORAGE_DIR } from '../settings';
 import { uploadToAzureBlob } from '../azure/upload';
-import { listAzureBlobs, getAzureDownloadUrl } from '../azure/assets';
+import { listAzureBlobs, getAzureDownloadUrl, getGifUrlForBlob } from '../azure/assets';
 import type { VideoDevice, AudioDevice, PaginatedAzureAssets } from '../../shared/types';
 
 export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
@@ -219,8 +219,8 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     (async () => {
       let success = false;
       try {
-        const azureUrl = await uploadToAzureBlob(filePath, email, win, gifPath, uploadId);
-        await sendPlaybackEmail(email, azureUrl, gifPath);
+        const { downloadUrl, gifUrl } = await uploadToAzureBlob(filePath, email, win, gifPath, uploadId);
+        await sendPlaybackEmail(email, downloadUrl, gifUrl);
         console.log(`[Email] Sent Azure download link to ${email}`);
         success = true;
         win.webContents.send('bayside:upload-complete', { uploadId, success: true });
@@ -252,7 +252,8 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
       throw new Error('Invalid email address');
     }
     const url = getAzureDownloadUrl(blobName);
-    await sendPlaybackEmail(email, url);
+    const gifUrl = await getGifUrlForBlob(blobName);
+    await sendPlaybackEmail(email, url, gifUrl);
     console.log(`[Email] Re-sent Azure download link for ${blobName} to ${email}`);
   });
 

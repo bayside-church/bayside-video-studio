@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { BrowserWindow } from 'electron';
-import { getContainerClient, generateDownloadSasUrl } from './client';
+import { getContainerClient, generateDownloadSasUrl, generateGifSasUrl } from './client';
 
 export async function uploadToAzureBlob(
   filePath: string,
@@ -10,7 +10,7 @@ export async function uploadToAzureBlob(
   window: BrowserWindow,
   gifPath?: string | null,
   uploadId?: string,
-): Promise<string> {
+): Promise<{ downloadUrl: string; gifUrl: string | null }> {
   const containerClient = getContainerClient();
 
   // Build blob name: YYYYMMDD_email_randomsuffix.mp4
@@ -59,5 +59,8 @@ export async function uploadToAzureBlob(
   });
 
   console.log(`[Azure] Uploaded blob: ${blobName} (${fileSize} bytes)`);
-  return generateDownloadSasUrl(blobName, blobName);
+  return {
+    downloadUrl: generateDownloadSasUrl(blobName, blobName),
+    gifUrl: gifBlobName ? generateGifSasUrl(gifBlobName) : null,
+  };
 }
