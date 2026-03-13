@@ -174,7 +174,7 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
   ipcMain.handle('bayside:start-recording', async (_event, email?: string) => {
     const win = getWindow();
     if (!win) throw new Error('No window available');
-    await ffmpegController.startRecording(win, email);
+    return await ffmpegController.startRecording(win, email);
   });
 
   ipcMain.handle('bayside:stop-recording', async (_event, rendererAudioPath?: string) => {

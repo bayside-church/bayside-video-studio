@@ -10,7 +10,7 @@ import { useSessionStore } from '../store/useSessionStore';
 import { getStream, stopRecording as stopBrowserRecording, stopAudioOnlyRecording, isAudioOnlyRecording } from '../utils/browserCapture';
 
 export default function RecordingScreen() {
-  const { email, setScreen, setFilePath, setError, isBrowserCapture, addPendingVideo } = useSessionStore();
+  const { email, filePath, setScreen, setFilePath, setError, isBrowserCapture, addPendingVideo } = useSessionStore();
   const stoppingRef = useRef(false);
   const [audioDeviceId, setAudioDeviceId] = useState<string | null>(null);
   const [maxSeconds, setMaxSeconds] = useState<number | null>(null);
@@ -24,15 +24,50 @@ export default function RecordingScreen() {
     if (stoppingRef.current) return;
     stoppingRef.current = true;
 
-    try {
-      let filePath: string;
-
-      if (isBrowserCapture) {
+    if (isBrowserCapture) {
+      // Browser capture: must await blob before transitioning
+      try {
         const { blob } = await stopBrowserRecording();
         const buffer = await blob.arrayBuffer();
-        filePath = await window.baysideAPI.saveBrowserRecording(buffer, email);
-      } else {
-        // Stop renderer audio-only recording if active, save to file for merge
+        const savedPath = await window.baysideAPI.saveBrowserRecording(buffer, email);
+        setFilePath(savedPath);
+
+        addPendingVideo({
+          id: savedPath,
+          email,
+          startedAt: new Date().toISOString(),
+          progress: 0,
+          status: 'uploading',
+        });
+
+        window.baysideAPI.uploadVideo(savedPath, email).catch((err) => {
+          console.error(`[Upload] Failed to start: ${err}`);
+        });
+
+        setScreen('complete');
+      } catch (err) {
+        stoppingRef.current = false;
+        setError(`Failed to stop recording: ${err}`);
+      }
+      return;
+    }
+
+    // FFmpeg recording: filePath is already known from startRecording — transition immediately
+    const recordingPath = filePath!;
+
+    addPendingVideo({
+      id: recordingPath,
+      email,
+      startedAt: new Date().toISOString(),
+      progress: 0,
+      status: 'uploading',
+    });
+
+    setScreen('complete');
+
+    // Stop FFmpeg + merge audio + upload — all in background
+    (async () => {
+      try {
         let rendererAudioPath: string | undefined;
         if (isAudioOnlyRecording()) {
           const audioBlob = await stopAudioOnlyRecording();
@@ -43,32 +78,17 @@ export default function RecordingScreen() {
           }
         }
 
-        const result = await window.baysideAPI.stopRecording(rendererAudioPath);
-        filePath = result.filePath;
+        await window.baysideAPI.stopRecording(rendererAudioPath);
+      } catch (err) {
+        console.error(`[Recording] Stop/merge failed: ${err}`);
       }
 
-      setFilePath(filePath);
-
-      // Track the upload in the pending list (global listeners in App handle progress/completion)
-      addPendingVideo({
-        id: filePath,
-        email,
-        startedAt: new Date().toISOString(),
-        progress: 0,
-        status: 'uploading',
-      });
-
-      // Fire-and-forget upload
-      window.baysideAPI.uploadVideo(filePath, email).catch((err) => {
+      // Upload after stop+merge completes
+      window.baysideAPI.uploadVideo(recordingPath, email).catch((err) => {
         console.error(`[Upload] Failed to start: ${err}`);
       });
-
-      setScreen('complete');
-    } catch (err) {
-      stoppingRef.current = false;
-      setError(`Failed to stop recording: ${err}`);
-    }
-  }, [setScreen, setFilePath, setError, isBrowserCapture, email]);
+    })();
+  }, [setScreen, setFilePath, setError, isBrowserCapture, email, filePath]);
 
   useEffect(() => {
     if (maxSeconds == null) return;

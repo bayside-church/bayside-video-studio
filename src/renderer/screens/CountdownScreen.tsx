@@ -8,7 +8,7 @@ import { COUNTDOWN_SECONDS } from '../../shared/constants';
 import { getStream, startRecording as startBrowserRecording, startAudioOnlyRecording } from '../utils/browserCapture';
 
 export default function CountdownScreen() {
-  const { email, setScreen, setError, isBrowserCapture } = useSessionStore();
+  const { email, setScreen, setError, setFilePath, isBrowserCapture } = useSessionStore();
   const [count, setCount] = useState(COUNTDOWN_SECONDS);
   const recordingStartedRef = useRef(false);
   const recordingReadyRef = useRef(false);
@@ -40,7 +40,8 @@ export default function CountdownScreen() {
             console.log('[Countdown] FFmpeg handles audio (DeckLink + external mic), skipping renderer audio capture');
           }
 
-          await window.baysideAPI.startRecording(email);
+          const result = await window.baysideAPI.startRecording(email);
+          setFilePath(result.filePath);
         }
         recordingReadyRef.current = true;
       } catch (err) {

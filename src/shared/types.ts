@@ -78,7 +78,7 @@ export interface BaysideAPI {
   startPreview: () => Promise<void>;
   stopPreview: () => Promise<void>;
   usesFFmpegAudio: () => Promise<boolean>;
-  startRecording: (email?: string) => Promise<void>;
+  startRecording: (email?: string) => Promise<{ filePath: string }>;
   stopRecording: (rendererAudioPath?: string) => Promise<RecordingResult>;
 
   // Device management

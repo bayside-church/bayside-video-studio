@@ -6,7 +6,7 @@ const api: BaysideAPI = {
   startPreview: () => ipcRenderer.invoke('bayside:start-preview'),
   stopPreview: () => ipcRenderer.invoke('bayside:stop-preview'),
   usesFFmpegAudio: () => ipcRenderer.invoke('bayside:uses-ffmpeg-audio'),
-  startRecording: (email?: string) => ipcRenderer.invoke('bayside:start-recording', email),
+  startRecording: (email?: string) => ipcRenderer.invoke('bayside:start-recording', email) as Promise<{ filePath: string }>,
   stopRecording: (rendererAudioPath?: string) =>
     ipcRenderer.invoke('bayside:stop-recording', rendererAudioPath),
   uploadVideo: (filePath: string, email: string) =>

@@ -77,7 +77,7 @@ class FFmpegController {
    * For DeckLink + external audio: spawns a separate audio-only FFmpeg process
    * to avoid timestamp domain conflicts.
    */
-  async startRecording(window: BrowserWindow, email?: string): Promise<void> {
+  async startRecording(window: BrowserWindow, email?: string): Promise<{ filePath: string }> {
     // Gracefully stop preview so avfoundation releases the camera cleanly
     await this.gracefulStop();
     // Brief pause for the camera device to be fully released
@@ -97,6 +97,8 @@ class FFmpegController {
     // getUserMedia/MediaRecorder (FFmpeg avfoundation can't reliably capture
     // USB audio interfaces like the Scarlett at 192kHz).
     this.spawnProcess(window, true);
+
+    return { filePath: this.recordingFilePath };
   }
 
   /**
