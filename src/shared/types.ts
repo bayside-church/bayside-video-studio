@@ -86,6 +86,11 @@ export interface BaysideAPI {
   selectAudioDevice: (device: AudioDevice | null) => Promise<void>;
   getAudioDelayMs: () => Promise<number>;
   setAudioDelayMs: (value: number) => Promise<void>;
+  getAudioChannels: () => Promise<string>;
+  setAudioChannels: (value: string) => Promise<void>;
+  startAudioMeter: (audioDeviceIndex: string, channels: string) => Promise<void>;
+  stopAudioMeter: () => Promise<void>;
+  onAudioMeterLevel: (callback: (data: { left: number; right: number }) => void) => () => void;
 
   // Upload & videos
   uploadVideo: (filePath: string, email: string) => Promise<void>;

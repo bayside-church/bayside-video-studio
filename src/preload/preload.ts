@@ -54,6 +54,15 @@ const api: BaysideAPI = {
   selectAudioDevice: (device: AudioDevice | null) => ipcRenderer.invoke('bayside:select-audio-device', device),
   getAudioDelayMs: () => ipcRenderer.invoke('bayside:get-audio-delay-ms'),
   setAudioDelayMs: (value: number) => ipcRenderer.invoke('bayside:set-audio-delay-ms', value),
+  getAudioChannels: () => ipcRenderer.invoke('bayside:get-audio-channels'),
+  setAudioChannels: (value: string) => ipcRenderer.invoke('bayside:set-audio-channels', value),
+  startAudioMeter: (audioDeviceIndex: string, channels: string) => ipcRenderer.invoke('bayside:start-audio-meter', audioDeviceIndex, channels),
+  stopAudioMeter: () => ipcRenderer.invoke('bayside:stop-audio-meter'),
+  onAudioMeterLevel: (callback: (data: { left: number; right: number }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: { left: number; right: number }) => callback(data);
+    ipcRenderer.on('bayside:audio-meter-level', handler);
+    return () => ipcRenderer.removeListener('bayside:audio-meter-level', handler);
+  },
 
   onPreviewFrame: (callback: (frame: PreviewFrame) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, frame: PreviewFrame) => callback(frame);

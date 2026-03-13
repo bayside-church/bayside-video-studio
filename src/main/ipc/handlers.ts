@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { spawn } from 'child_process';
 import { listAllDevices, listAllAudioDevices } from '../ffmpeg/devices';
 import { hasDeckLinkSupport, clearCachedPath } from '../ffmpeg/binary';
-import { ffmpegController, probeVideoDevice, probeDeckLinkDevice } from '../ffmpeg/controller';
+import { ffmpegController, probeVideoDevice, probeDeckLinkDevice, startAudioMeter, stopAudioMeter } from '../ffmpeg/controller';
 import {
   getSelectedDevice, setSelectedDevice, getSelectedAudioDevice, setSelectedAudioDevice,
   getAdminPin, setAdminPin, getGuides, setGuides,
@@ -17,6 +17,7 @@ import {
   getAzureBlobConnectionString, setAzureBlobConnectionString,
   getAzureBlobContainerName, setAzureBlobContainerName,
   getAudioDelayMs, setAudioDelayMs,
+  getAudioChannels, setAudioChannels,
   getMissingRequiredSettings,
   type GuideSettings,
 } from '../settings';
@@ -370,6 +371,23 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('bayside:set-audio-delay-ms', async (_event, value: number) => {
     setAudioDelayMs(value);
+  });
+
+  ipcMain.handle('bayside:get-audio-channels', async () => {
+    return getAudioChannels();
+  });
+
+  ipcMain.handle('bayside:set-audio-channels', async (_event, value: string) => {
+    setAudioChannels(value);
+  });
+
+  ipcMain.handle('bayside:start-audio-meter', async (_event, audioDeviceIndex: string, channels: string) => {
+    const window = getWindow();
+    if (window) startAudioMeter(audioDeviceIndex, channels, window);
+  });
+
+  ipcMain.handle('bayside:stop-audio-meter', async () => {
+    stopAudioMeter();
   });
 
   ipcMain.handle('bayside:get-missing-settings', async () => {

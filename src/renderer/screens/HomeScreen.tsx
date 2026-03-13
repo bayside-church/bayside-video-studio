@@ -644,6 +644,9 @@ function MicPanel({ onDeviceChanged }: { onDeviceChanged: (id: string | null) =>
   const [testing, setTesting] = useState(false);
   const [audioDelayMs, setAudioDelayMs] = useState(0);
   const [audioDelayDraft, setAudioDelayDraft] = useState('0');
+  const [audioChannels, setAudioChannels] = useState('0-1');
+  const [meterLeft, setMeterLeft] = useState(0);
+  const [meterRight, setMeterRight] = useState(0);
 
   useEffect(() => {
     loadDevices();
@@ -651,7 +654,29 @@ function MicPanel({ onDeviceChanged }: { onDeviceChanged: (id: string | null) =>
       setAudioDelayMs(v);
       setAudioDelayDraft(String(v));
     });
+    window.baysideAPI.getAudioChannels().then(setAudioChannels);
   }, []);
+
+  // Start/stop audio meter when device or channels change
+  useEffect(() => {
+    if (!selected) {
+      setMeterLeft(0);
+      setMeterRight(0);
+      return;
+    }
+    const audioIndex = selected.id.split(':')[1];
+    window.baysideAPI.startAudioMeter(audioIndex, audioChannels);
+    const cleanup = window.baysideAPI.onAudioMeterLevel(({ left, right }) => {
+      setMeterLeft(left);
+      setMeterRight(right);
+    });
+    return () => {
+      cleanup();
+      window.baysideAPI.stopAudioMeter();
+      setMeterLeft(0);
+      setMeterRight(0);
+    };
+  }, [selected, audioChannels]);
 
   async function loadDevices() {
     setScanning(true);
@@ -737,7 +762,78 @@ function MicPanel({ onDeviceChanged }: { onDeviceChanged: (id: string | null) =>
       )}
 
       {selected && (
-        <div className="border-t border-surface-border mt-4 pt-4">
+        <div className="border-t border-surface-border mt-4 pt-4 space-y-4">
+          <div>
+            <label className="text-[11px] font-medium text-text-tertiary mb-1 block">
+              Input Channels
+            </label>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-[10px] text-text-tertiary mb-0.5 block">Left</label>
+                <select
+                  value={audioChannels.split('-')[0]}
+                  onChange={(e) => {
+                    const val = `${e.target.value}-${audioChannels.split('-')[1]}`;
+                    setAudioChannels(val);
+                    window.baysideAPI.setAudioChannels(val);
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-surface-base text-text-primary text-xs outline-none shadow-[0_0_0_1px_rgba(255,255,255,0.08)] focus:shadow-[0_0_0_1px_rgba(129,140,248,0.5)] transition-shadow"
+                >
+                  {Array.from({ length: 20 }, (_, i) => (
+                    <option key={i} value={String(i)}>Ch {i + 1}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="text-[10px] text-text-tertiary mb-0.5 block">Right</label>
+                <select
+                  value={audioChannels.split('-')[1]}
+                  onChange={(e) => {
+                    const val = `${audioChannels.split('-')[0]}-${e.target.value}`;
+                    setAudioChannels(val);
+                    window.baysideAPI.setAudioChannels(val);
+                  }}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-surface-base text-text-primary text-xs outline-none shadow-[0_0_0_1px_rgba(255,255,255,0.08)] focus:shadow-[0_0_0_1px_rgba(129,140,248,0.5)] transition-shadow"
+                >
+                  {Array.from({ length: 20 }, (_, i) => (
+                    <option key={i} value={String(i)}>Ch {i + 1}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <p className="text-text-tertiary text-[10px] mt-1">
+              Select which input channels to record as stereo left and right.
+            </p>
+            {/* Live level meter for selected channels */}
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-text-tertiary w-3">L</span>
+                <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-75"
+                    style={{
+                      width: `${Math.min(100, meterLeft * 100)}%`,
+                      backgroundColor: meterLeft > 0.85 ? '#f87171' : meterLeft > 0.6 ? '#facc15' : '#4ade80',
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-text-tertiary w-3">R</span>
+                <div className="flex-1 h-2 rounded-full bg-white/5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-75"
+                    style={{
+                      width: `${Math.min(100, meterRight * 100)}%`,
+                      backgroundColor: meterRight > 0.85 ? '#f87171' : meterRight > 0.6 ? '#facc15' : '#4ade80',
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
           <label className="text-[11px] font-medium text-text-tertiary mb-1 block">
             Audio Sync Correction (ms)
           </label>
@@ -761,6 +857,7 @@ function MicPanel({ onDeviceChanged }: { onDeviceChanged: (id: string | null) =>
           <p className="text-text-tertiary text-[10px] mt-1">
             If audio plays before the video, use a positive value. If audio is behind, use a negative value. Only affects DeckLink + USB mic recordings. Range: -500 to 500.
           </p>
+          </div>
         </div>
       )}
     </div>

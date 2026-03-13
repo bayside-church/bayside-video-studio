@@ -62,6 +62,7 @@ interface Settings {
   azureBlobConnectionString: string;
   azureBlobContainerName: string;
   audioDelayMs: number;
+  audioChannels: string; // e.g. "0-1" (0-indexed channel pair for ffmpeg pan filter)
 }
 
 function getDefaults(): Settings {
@@ -81,6 +82,7 @@ function getDefaults(): Settings {
     azureBlobConnectionString: '',
     azureBlobContainerName: '',
     audioDelayMs: 0,
+    audioChannels: '0-1',
   };
 }
 
@@ -276,6 +278,16 @@ export function getAudioDelayMs(): number {
 export function setAudioDelayMs(value: number): void {
   const settings = readSettings();
   settings.audioDelayMs = value;
+  writeSettings(settings);
+}
+
+export function getAudioChannels(): string {
+  return readSettings().audioChannels ?? '0-1';
+}
+
+export function setAudioChannels(value: string): void {
+  const settings = readSettings();
+  settings.audioChannels = value;
   writeSettings(settings);
 }
 

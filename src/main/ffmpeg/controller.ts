@@ -12,7 +12,7 @@ import {
   PREVIEW_HEIGHT,
   FFMPEG_STOP_TIMEOUT_MS,
 } from '../../shared/constants';
-import { getAudioDelayMs } from '../settings';
+import { getAudioDelayMs, getAudioChannels } from '../settings';
 
 // JPEG SOI (Start of Image) and EOI (End of Image) markers
 const SOI = Buffer.from([0xff, 0xd8]);
@@ -316,17 +316,20 @@ class FFmpegController {
       const audioIndex = this.audioDevice!.id.split(':')[1];
       const deviceIndex = this.device!.id.split(':')[1];
 
+      const framerate = this.captureFramerate ?? '30';
+      const channels = getAudioChannels(); // e.g. "0-1"
+      const [ch0, ch1] = channels.split('-').map(Number);
       args = [
-        '-f', 'avfoundation', '-framerate', '30', '-video_size', this.captureResolution ?? '1920x1080',
+        '-f', 'avfoundation', '-framerate', framerate, '-video_size', this.captureResolution ?? '1920x1080',
         '-i', `${deviceIndex}:${audioIndex}`,
         // Output 1: H.264 recording + audio
         '-map', '0:v', '-map', '0:a',
-        '-fps_mode', 'cfr', '-r', '30',
+        '-fps_mode', 'cfr', '-r', framerate,
         '-c:v', 'h264_videotoolbox',
         '-b:v', '30M',
         '-profile:v', 'high',
         '-level', '5.1',
-        '-c:a', 'aac', '-b:a', '192k',
+        '-af', `pan=stereo|c0=c${ch0}|c1=c${ch1}`, '-c:a', 'aac', '-b:a', '192k',
         '-movflags', '+faststart',
         this.recordingFilePath!,
         // Output 2: MJPEG preview to stdout (scaled down, no audio)
@@ -710,6 +713,76 @@ export function probeVideoDevice(deviceIndex: string): Promise<boolean> {
  * Quick probe to check if a DeckLink device can be opened.
  * Returns true if FFmpeg can detect input from the device.
  */
+// --- Audio channel level meter ---
+// Spawns a lightweight ffmpeg process that reads audio from an AVFoundation device
+// and outputs per-channel RMS levels via the astats filter. Used by the MicPanel
+// to let the user see which channels have signal.
+
+let meterProcess: ChildProcess | null = null;
+
+export function startAudioMeter(
+  audioDeviceIndex: string,
+  channels: string, // e.g. "0-1"
+  window: BrowserWindow,
+): void {
+  stopAudioMeter();
+
+  const ffmpeg = getFFmpegPath();
+  const [ch0, ch1] = channels.split('-').map(Number);
+
+  const proc = spawn(ffmpeg, [
+    '-f', 'avfoundation',
+    '-i', `:${audioDeviceIndex}`,
+    '-af', `pan=stereo|c0=c${ch0}|c1=c${ch1},astats=metadata=1:reset=1,ametadata=mode=print:file=-`,
+    '-f', 'null', '-',
+  ], { stdio: ['pipe', 'pipe', 'pipe'] });
+
+  meterProcess = proc;
+
+  // astats outputs per-channel RMS via ametadata print to stdout
+  let stdoutBuf = '';
+  let lastLeft = 0;
+  let lastRight = 0;
+  proc.stdout?.on('data', (data: Buffer) => {
+    stdoutBuf += data.toString();
+
+    const lines = stdoutBuf.split('\n');
+    stdoutBuf = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const m1 = line.match(/lavfi\.astats\.1\.RMS_level=([-\d.inf]+)/);
+      const m2 = line.match(/lavfi\.astats\.2\.RMS_level=([-\d.inf]+)/);
+      if (m1) {
+        const db = parseFloat(m1[1]);
+        lastLeft = isFinite(db) && db > -60 ? Math.min(1, (db + 60) / 60) : 0;
+      }
+      if (m2) {
+        const db = parseFloat(m2[1]);
+        lastRight = isFinite(db) && db > -60 ? Math.min(1, (db + 60) / 60) : 0;
+        // Emit after we have both channels
+        if (!window.isDestroyed()) {
+          window.webContents.send('bayside:audio-meter-level', { left: lastLeft, right: lastRight });
+        }
+      }
+    }
+  });
+
+  proc.on('close', () => {
+    if (meterProcess === proc) meterProcess = null;
+  });
+
+  proc.on('error', () => {
+    if (meterProcess === proc) meterProcess = null;
+  });
+}
+
+export function stopAudioMeter(): void {
+  if (meterProcess && !meterProcess.killed) {
+    meterProcess.kill('SIGKILL');
+    meterProcess = null;
+  }
+}
+
 export function probeDeckLinkDevice(deviceName: string): Promise<boolean> {
   const ffmpeg = getFFmpegPath();
   return new Promise((resolve) => {
