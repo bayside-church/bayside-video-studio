@@ -10,3 +10,4 @@ dist/
 *.log
 coverage/
 .DS_Store
+.ffmpeg-build/
