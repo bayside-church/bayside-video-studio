@@ -12,7 +12,6 @@ const api: BaysideAPI = {
   uploadVideo: (filePath: string, email: string) =>
     ipcRenderer.invoke('bayside:upload-video', filePath, email),
   listAzureBlobs: (page?: number) => ipcRenderer.invoke('bayside:list-azure-blobs', page),
-  getAzurePreviewUrl: (blobName: string) => ipcRenderer.invoke('bayside:get-azure-preview-url', blobName),
   resendAzureDownload: (blobName: string, email: string) =>
     ipcRenderer.invoke('bayside:resend-azure-download', blobName, email),
   saveBrowserRecording: (buffer: ArrayBuffer, email?: string) =>
@@ -81,6 +80,12 @@ const api: BaysideAPI = {
     const handler = (_event: Electron.IpcRendererEvent, error: string) => callback(error);
     ipcRenderer.on('bayside:error', handler);
     return () => ipcRenderer.removeListener('bayside:error', handler);
+  },
+
+  onUploadComplete: (callback: (data: { success: boolean; error?: string }) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: { success: boolean; error?: string }) => callback(data);
+    ipcRenderer.on('bayside:upload-complete', handler);
+    return () => ipcRenderer.removeListener('bayside:upload-complete', handler);
   },
 };
 

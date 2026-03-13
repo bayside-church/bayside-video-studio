@@ -17,7 +17,6 @@ export function useIdleTimeout() {
     // Don't run idle timeout on non-interactive screens
     if (
       screen === 'home' ||
-      screen === 'processing' ||
       screen === 'complete' ||
       screen === 'recording' ||
       screen === 'countdown' ||

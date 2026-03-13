@@ -877,17 +877,28 @@ function AzureVideosPanel() {
   const [sending, setSending] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [loadingPreview, setLoadingPreview] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasMoreRef = useRef(false);
   const loadingMoreRef = useRef(false);
   hasMoreRef.current = hasMore;
   loadingMoreRef.current = loadingMore;
 
+  const pendingVideos = useSessionStore((s) => s.pendingVideos);
+  const prevPendingRef = useRef(pendingVideos);
+
   useEffect(() => {
     loadBlobs();
   }, []);
+
+  // Auto-refresh the blob list when a pending video disappears (upload finished)
+  useEffect(() => {
+    const prev = prevPendingRef.current;
+    prevPendingRef.current = pendingVideos;
+    // If a pending video was removed (completed), refresh the list
+    if (prev.length > pendingVideos.length) {
+      loadBlobs();
+    }
+  }, [pendingVideos]);
 
   async function loadBlobs() {
     setLoading(true);
@@ -977,33 +988,62 @@ function AzureVideosPanel() {
           <div className="flex items-center justify-center py-12">
             <div className="w-6 h-6 border-2 border-surface-border border-t-accent rounded-full animate-spin" />
           </div>
-        ) : blobs.length === 0 ? (
+        ) : blobs.length === 0 && pendingVideos.length === 0 ? (
           <div className="py-12 text-center px-4">
             <p className="text-text-secondary text-sm">No videos found</p>
           </div>
         ) : (
-          blobs.map((blob) => {
+          <>
+          {pendingVideos.map((pv) => (
+            <div
+              key={pv.id}
+              className="w-full text-left px-5 py-3 border-b border-white/[0.04] bg-white/[0.02]"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-2">
+                  {pv.status === 'uploading' ? (
+                    <div className="w-3.5 h-3.5 border-[1.5px] border-surface-border border-t-accent rounded-full animate-spin flex-shrink-0" />
+                  ) : pv.status === 'complete' ? (
+                    <span className="text-success text-xs flex-shrink-0">&#10003;</span>
+                  ) : (
+                    <span className="text-red-400 text-xs flex-shrink-0">!</span>
+                  )}
+                  <p className="text-sm font-semibold text-text-primary truncate">
+                    {pv.status === 'uploading' ? 'Uploading...' : pv.status === 'complete' ? 'Upload complete' : 'Upload failed'}
+                  </p>
+                </div>
+                {pv.status === 'uploading' && (
+                  <span className="text-[10px] text-text-tertiary ml-2 flex-shrink-0 tabular-nums">
+                    {pv.progress}%
+                  </span>
+                )}
+              </div>
+              {pv.email && (
+                <p className="text-[11px] text-text-tertiary mt-0.5 truncate pl-[22px]">{pv.email}</p>
+              )}
+              {pv.status === 'uploading' && (
+                <div className="mt-2 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div
+                    className="h-full bg-accent rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${pv.progress}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+          {blobs.map((blob) => {
             const isActive = blob.name === selectedName;
             return (
-              <button
+              <div
+                role="button"
+                tabIndex={0}
                 key={blob.name}
-                onClick={async () => {
+                onClick={() => {
                   if (isActive) {
                     setSelectedName(null);
-                    setPreviewUrl(null);
                   } else {
                     setEmail(blob.email ?? '');
                     setSelectedName(blob.name);
-                    setPreviewUrl(null);
-                    setLoadingPreview(true);
-                    try {
-                      const url = await window.baysideAPI.getAzurePreviewUrl(blob.name);
-                      setPreviewUrl(url);
-                    } catch {
-                      setPreviewUrl(null);
-                    } finally {
-                      setLoadingPreview(false);
-                    }
                   }
                   setError(null);
                   setSent(null);
@@ -1013,6 +1053,20 @@ function AzureVideosPanel() {
                   ${isActive ? 'bg-accent-muted' : 'hover:bg-white/[0.03]'}
                 `}
               >
+                {/* GIF preview (always visible) */}
+                {blob.gifUrl ? (
+                  <img
+                    src={blob.gifUrl}
+                    alt="Preview"
+                    className="w-full rounded-lg mb-2"
+                    style={{ maxHeight: '160px', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div className="w-full h-20 rounded-lg mb-2 bg-white/[0.04] flex items-center justify-center">
+                    <span className="text-text-tertiary text-xs">No preview</span>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between mb-0.5">
                   <p className={`text-sm font-semibold truncate ${isActive ? 'text-accent' : 'text-text-primary'}`}>
                     {formatDate(blob.uploadedAt)}
@@ -1030,20 +1084,6 @@ function AzureVideosPanel() {
                     className="mt-3 pt-3 border-t border-white/[0.06]"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {/* Video preview */}
-                    {loadingPreview ? (
-                      <div className="flex items-center justify-center py-6 mb-3">
-                        <div className="w-5 h-5 border-2 border-surface-border border-t-accent rounded-full animate-spin" />
-                      </div>
-                    ) : previewUrl ? (
-                      <video
-                        src={previewUrl}
-                        controls
-                        className="w-full rounded-lg mb-3"
-                        style={{ maxHeight: '200px' }}
-                      />
-                    ) : null}
-
                     <p className="text-xs text-text-tertiary mb-2">Re-send download link</p>
                     <div className="flex gap-1.5">
                       <input
@@ -1068,9 +1108,10 @@ function AzureVideosPanel() {
                     )}
                   </div>
                 )}
-              </button>
+              </div>
             );
-          })
+          })}
+          </>
         )}
         {loadingMore && (
           <div className="flex items-center justify-center py-4">

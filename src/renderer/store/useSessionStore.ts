@@ -1,24 +1,27 @@
 import { create } from 'zustand';
-import type { Screen, GuideSettings } from '../../shared/types';
+import type { Screen, GuideSettings, PendingVideo } from '../../shared/types';
 
 interface SessionStore {
   screen: Screen;
   email: string;
   filePath: string | null;
-  uploadProgress: number;
   playbackUrl: string | null;
   errorMessage: string | null;
   guides: GuideSettings;
   isBrowserCapture: boolean;
+  pendingVideos: PendingVideo[];
 
   setScreen: (screen: Screen) => void;
   setEmail: (email: string) => void;
   setFilePath: (path: string) => void;
-  setUploadProgress: (progress: number) => void;
   setPlaybackUrl: (url: string) => void;
   setError: (message: string) => void;
   setGuides: (guides: GuideSettings) => void;
   setIsBrowserCapture: (v: boolean) => void;
+  addPendingVideo: (video: PendingVideo) => void;
+  updatePendingVideoProgress: (id: string, progress: number) => void;
+  completePendingVideo: (id: string, status: 'complete' | 'failed') => void;
+  removePendingVideo: (id: string) => void;
   reset: () => void;
 }
 
@@ -26,11 +29,11 @@ const initialState = {
   screen: 'home' as Screen,
   email: '',
   filePath: null as string | null,
-  uploadProgress: 0,
   playbackUrl: null as string | null,
   errorMessage: null as string | null,
   guides: { ruleOfThirds: true, centerCrosshair: true, safeZones: false } as GuideSettings,
   isBrowserCapture: false,
+  pendingVideos: [] as PendingVideo[],
 };
 
 export const useSessionStore = create<SessionStore>((set) => ({
@@ -38,10 +41,25 @@ export const useSessionStore = create<SessionStore>((set) => ({
   setScreen: (screen) => set({ screen }),
   setEmail: (email) => set({ email }),
   setFilePath: (filePath) => set({ filePath }),
-  setUploadProgress: (uploadProgress) => set({ uploadProgress }),
   setPlaybackUrl: (playbackUrl) => set({ playbackUrl }),
   setError: (errorMessage) => set({ errorMessage, screen: 'error' }),
   setGuides: (guides) => set({ guides }),
   setIsBrowserCapture: (isBrowserCapture) => set({ isBrowserCapture }),
-  reset: () => set({ ...initialState }),
+  addPendingVideo: (video) => set((state) => ({
+    pendingVideos: [video, ...state.pendingVideos],
+  })),
+  updatePendingVideoProgress: (id, progress) => set((state) => ({
+    pendingVideos: state.pendingVideos.map((v) =>
+      v.id === id ? { ...v, progress } : v
+    ),
+  })),
+  completePendingVideo: (id, status) => set((state) => ({
+    pendingVideos: state.pendingVideos.map((v) =>
+      v.id === id ? { ...v, status, progress: status === 'complete' ? 100 : v.progress } : v
+    ),
+  })),
+  removePendingVideo: (id) => set((state) => ({
+    pendingVideos: state.pendingVideos.filter((v) => v.id !== id),
+  })),
+  reset: () => set((state) => ({ ...initialState, pendingVideos: state.pendingVideos })),
 }));

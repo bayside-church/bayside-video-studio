@@ -8,6 +8,7 @@ export async function uploadToAzureBlob(
   filePath: string,
   email: string,
   window: BrowserWindow,
+  gifPath?: string | null,
 ): Promise<string> {
   const containerClient = getContainerClient();
 
@@ -18,6 +19,19 @@ export async function uploadToAzureBlob(
   const suffix = crypto.randomBytes(4).toString('hex');
   const ext = path.extname(filePath) || '.mp4';
   const blobName = `${dateStr}_${safeEmail}_${suffix}${ext}`;
+
+  // Upload GIF preview if available
+  let gifBlobName = '';
+  if (gifPath && fs.existsSync(gifPath)) {
+    gifBlobName = blobName.replace(/\.[^.]+$/, '.gif');
+    const gifClient = containerClient.getBlockBlobClient(gifBlobName);
+    await gifClient.uploadFile(gifPath, {
+      blobHTTPHeaders: {
+        blobContentType: 'image/gif',
+      },
+    });
+    console.log(`[Azure] Uploaded GIF preview: ${gifBlobName}`);
+  }
 
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
   const fileSize = fs.statSync(filePath).size;
@@ -30,6 +44,7 @@ export async function uploadToAzureBlob(
     metadata: {
       email,
       uploadedat: now.toISOString(),
+      ...(gifBlobName ? { gifblob: gifBlobName } : {}),
     },
     onProgress: (progress) => {
       const percent = fileSize > 0 ? Math.round((progress.loadedBytes / fileSize) * 100) : 0;

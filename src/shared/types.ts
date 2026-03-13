@@ -2,7 +2,6 @@ export type Screen =
   | 'home'
   | 'countdown'
   | 'recording'
-  | 'processing'
   | 'complete'
   | 'error'
   | 'unavailable';
@@ -11,7 +10,6 @@ export interface SessionState {
   screen: Screen;
   email: string;
   filePath: string | null;
-  uploadProgress: number;
   playbackUrl: string | null;
   errorMessage: string | null;
 }
@@ -56,12 +54,21 @@ export interface AzureBlobSummary {
   uploadedAt: string;
   url: string;
   size: number;
+  gifUrl?: string;
 }
 
 export interface PaginatedAzureAssets {
   assets: AzureBlobSummary[];
   hasMore: boolean;
   nextPage: number;
+}
+
+export interface PendingVideo {
+  id: string;         // unique identifier (filePath)
+  email: string;
+  startedAt: string;  // ISO date string
+  progress: number;   // 0-100
+  status: 'uploading' | 'complete' | 'failed';
 }
 
 export interface BaysideAPI {
@@ -95,13 +102,13 @@ export interface BaysideAPI {
   // Upload & videos
   uploadVideo: (filePath: string, email: string) => Promise<void>;
   listAzureBlobs: (page?: number) => Promise<PaginatedAzureAssets>;
-  getAzurePreviewUrl: (blobName: string) => Promise<string>;
   resendAzureDownload: (blobName: string, email: string) => Promise<void>;
 
   // Events
   onPreviewFrame: (callback: (frame: PreviewFrame) => void) => () => void;
   onUploadProgress: (callback: (progress: UploadProgress) => void) => () => void;
   onError: (callback: (error: string) => void) => () => void;
+  onUploadComplete: (callback: (data: { success: boolean; error?: string }) => void) => () => void;
 
   // Browser capture
   saveBrowserRecording: (buffer: ArrayBuffer, email?: string) => Promise<string>;

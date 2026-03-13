@@ -1,4 +1,4 @@
-import { getContainerClient, generateDownloadSasUrl, generatePreviewSasUrl } from './client';
+import { getContainerClient, generateDownloadSasUrl, generateGifSasUrl } from './client';
 import type { AzureBlobSummary, PaginatedAzureAssets } from '../../shared/types';
 
 export async function listAzureBlobs(page = 1, limit = 20): Promise<PaginatedAzureAssets> {
@@ -10,12 +10,14 @@ export async function listAzureBlobs(page = 1, limit = 20): Promise<PaginatedAzu
   for await (const blob of containerClient.listBlobsFlat({ includeMetadata: true })) {
     const email = blob.metadata?.email;
     if (!email) continue;
+    const gifBlobName = blob.metadata?.gifblob;
     allBlobs.push({
       name: blob.name,
       email,
       uploadedAt: blob.metadata?.uploadedat ?? blob.properties.createdOn?.toISOString() ?? '',
       url: `${containerClient.url}/${blob.name}`,
       size: blob.properties.contentLength ?? 0,
+      gifUrl: gifBlobName ? generateGifSasUrl(gifBlobName) : undefined,
     });
   }
 
@@ -42,6 +44,3 @@ export function getAzureDownloadUrl(blobName: string): string {
   return generateDownloadSasUrl(blobName, blobName);
 }
 
-export function getAzurePreviewUrl(blobName: string): string {
-  return generatePreviewSasUrl(blobName);
-}

@@ -27,7 +27,7 @@ import { deleteRecording } from '../cleanup';
 import { getRecordingsDir, TEMP_FALLBACK_DIR } from '../config';
 import { DEFAULT_STORAGE_DIR } from '../settings';
 import { uploadToAzureBlob } from '../azure/upload';
-import { listAzureBlobs, getAzureDownloadUrl, getAzurePreviewUrl } from '../azure/assets';
+import { listAzureBlobs, getAzureDownloadUrl } from '../azure/assets';
 import type { VideoDevice, AudioDevice, PaginatedAzureAssets } from '../../shared/types';
 
 export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
@@ -209,11 +209,13 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
     // Fire-and-forget: upload to Azure, then send email with Azure URL
     (async () => {
       try {
-        const azureUrl = await uploadToAzureBlob(filePath, email, win);
+        const azureUrl = await uploadToAzureBlob(filePath, email, win, gifPath);
         await sendPlaybackEmail(email, azureUrl, gifPath);
         console.log(`[Email] Sent Azure download link to ${email}`);
+        win.webContents.send('bayside:upload-complete', { success: true });
       } catch (err) {
         console.error(`[Background] Azure upload or email failed: ${err}`);
+        win.webContents.send('bayside:upload-complete', { success: false, error: String(err) });
       } finally {
         if (getAutoDeleteOnUpload()) {
           deleteRecording(filePath);
@@ -231,10 +233,6 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('bayside:list-azure-blobs', async (_event, page?: number): Promise<PaginatedAzureAssets> => {
     return await listAzureBlobs(page ?? 1);
-  });
-
-  ipcMain.handle('bayside:get-azure-preview-url', async (_event, blobName: string): Promise<string> => {
-    return getAzurePreviewUrl(blobName);
   });
 
   ipcMain.handle('bayside:resend-azure-download', async (_event, blobName: string, email: string) => {

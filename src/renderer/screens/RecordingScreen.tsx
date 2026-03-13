@@ -10,7 +10,7 @@ import { useSessionStore } from '../store/useSessionStore';
 import { getStream, stopRecording as stopBrowserRecording, stopAudioOnlyRecording, isAudioOnlyRecording } from '../utils/browserCapture';
 
 export default function RecordingScreen() {
-  const { email, setScreen, setFilePath, setError, isBrowserCapture } = useSessionStore();
+  const { email, setScreen, setFilePath, setError, isBrowserCapture, addPendingVideo } = useSessionStore();
   const stoppingRef = useRef(false);
   const [audioDeviceId, setAudioDeviceId] = useState<string | null>(null);
   const [maxSeconds, setMaxSeconds] = useState<number | null>(null);
@@ -23,13 +23,14 @@ export default function RecordingScreen() {
   const handleStop = useCallback(async () => {
     if (stoppingRef.current) return;
     stoppingRef.current = true;
+
     try {
+      let filePath: string;
+
       if (isBrowserCapture) {
         const { blob } = await stopBrowserRecording();
         const buffer = await blob.arrayBuffer();
-        const filePath = await window.baysideAPI.saveBrowserRecording(buffer, email);
-        setFilePath(filePath);
-        setScreen('processing');
+        filePath = await window.baysideAPI.saveBrowserRecording(buffer, email);
       } else {
         // Stop renderer audio-only recording if active, save to file for merge
         let rendererAudioPath: string | undefined;
@@ -43,9 +44,26 @@ export default function RecordingScreen() {
         }
 
         const result = await window.baysideAPI.stopRecording(rendererAudioPath);
-        setFilePath(result.filePath);
-        setScreen('processing');
+        filePath = result.filePath;
       }
+
+      setFilePath(filePath);
+
+      // Track the upload in the pending list (global listeners in App handle progress/completion)
+      addPendingVideo({
+        id: filePath,
+        email,
+        startedAt: new Date().toISOString(),
+        progress: 0,
+        status: 'uploading',
+      });
+
+      // Fire-and-forget upload
+      window.baysideAPI.uploadVideo(filePath, email).catch((err) => {
+        console.error(`[Upload] Failed to start: ${err}`);
+      });
+
+      setScreen('complete');
     } catch (err) {
       stoppingRef.current = false;
       setError(`Failed to stop recording: ${err}`);
