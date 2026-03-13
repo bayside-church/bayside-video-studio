@@ -16,7 +16,7 @@ const config: ForgeConfig = {
     },
     osxNotarize: {
       appleId: process.env.APPLE_ID!,
-      appleIdPassword: process.env.APPLE_ID_PASSWORD!,
+      appleIdPassword: process.env.APP_PASSWORD!,
       teamId: '6RSR5NNF9Q',
     },
   },
