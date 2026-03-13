@@ -30,10 +30,12 @@ class FFmpegController {
   private recordingStartTime: number | null = null;
   private frameBuffer = Buffer.alloc(0);
   private captureResolution: string | null = null;
+  private captureFramerate: string | null = null;
 
   setDevice(device: VideoDevice) {
     this.device = device;
     this.captureResolution = null;
+    this.captureFramerate = null;
   }
 
   getDevice(): VideoDevice | null {
@@ -147,7 +149,7 @@ class FFmpegController {
   private async ensureCaptureResolution(): Promise<void> {
     if (this.device?.format === 'avfoundation' && !this.captureResolution) {
       this.captureResolution = await this.probeResolution();
-      console.log(`[FFmpeg] Selected capture resolution: ${this.captureResolution}`);
+      console.log(`[FFmpeg] Selected capture: ${this.captureResolution}@${this.captureFramerate ?? '30'}fps`);
     }
   }
 
@@ -159,7 +161,8 @@ class FFmpegController {
       return ['-f', 'decklink', '-i', this.device.name];
     }
 
-    return ['-f', 'avfoundation', '-framerate', '30', '-video_size', this.captureResolution ?? '1920x1080', '-i', `${deviceIndex}:none`];
+    const framerate = this.captureFramerate ?? '30';
+    return ['-f', 'avfoundation', '-framerate', framerate, '-video_size', this.captureResolution ?? '1920x1080', '-i', `${deviceIndex}:none`];
   }
 
   /**
@@ -429,30 +432,36 @@ class FFmpegController {
     if (!this.device) return Promise.resolve('1920x1080');
     const ffmpeg = getFFmpegPath();
     const deviceIndex = this.device.id.split(':')[1];
+    // Try 30fps first (most cameras), then common capture card rates
+    const FRAMERATES = ['30', '29.97', '25', '24', '23.976'];
 
     return new Promise((resolve) => {
       let resolved = false;
-      let index = 0;
+      let resIndex = 0;
+      let fpsIndex = 0;
 
-      const done = (res: string) => {
+      const done = (res: string, fps: string) => {
         if (resolved) return;
         resolved = true;
+        this.captureFramerate = fps;
         resolve(res);
       };
 
       const tryNext = () => {
         if (resolved) return;
-        if (index >= CAPTURE_RESOLUTIONS.length) {
-          done('1920x1080');
+        if (resIndex >= CAPTURE_RESOLUTIONS.length) {
+          // Exhausted all combinations — default
+          done('1920x1080', '30');
           return;
         }
 
-        const res = CAPTURE_RESOLUTIONS[index];
-        console.log(`[FFmpeg] Probing resolution ${res}...`);
+        const res = CAPTURE_RESOLUTIONS[resIndex];
+        const fps = FRAMERATES[fpsIndex];
+        console.log(`[FFmpeg] Probing ${res}@${fps}fps...`);
 
         const proc = spawn(ffmpeg, [
           '-f', 'avfoundation',
-          '-framerate', '30',
+          '-framerate', fps,
           '-video_size', res,
           '-i', `${deviceIndex}:none`,
           '-frames:v', '1',
@@ -461,30 +470,45 @@ class FFmpegController {
         ], { stdio: ['pipe', 'pipe', 'pipe'] });
 
         let succeeded = false;
+        let stderrBuf = '';
 
         const timeout = setTimeout(() => {
           if (!succeeded) {
-            console.log(`[FFmpeg] Resolution ${res} probe timed out, trying next...`);
+            console.log(`[FFmpeg] Probe ${res}@${fps}fps timed out, trying next...`);
             proc.kill('SIGKILL');
-            // Don't assume success on timeout — try next resolution
           }
         }, 3000);
 
         proc.stderr?.on('data', (data: Buffer) => {
           const msg = data.toString();
+          stderrBuf += msg;
           if (msg.includes('Output #0') || msg.includes('frame=')) {
             succeeded = true;
             clearTimeout(timeout);
             proc.kill('SIGKILL');
-            done(res);
+            done(res, fps);
           }
         });
 
         proc.on('close', (code) => {
           clearTimeout(timeout);
           if (!succeeded && !resolved) {
-            console.log(`[FFmpeg] Resolution ${res} not supported (exit ${code}), trying next...`);
-            index++;
+            // Check if stderr mentions "Supported modes" with a hint for the right settings
+            const modeMatch = stderrBuf.match(/(\d{3,4}x\d{3,4})@\[(\d+\.?\d*)\s/);
+            if (modeMatch) {
+              const detectedRes = modeMatch[1];
+              const detectedFps = modeMatch[2];
+              console.log(`[FFmpeg] Device reports supported mode: ${detectedRes}@${detectedFps}fps, trying...`);
+              // Try the exact reported mode
+              tryExact(detectedRes, detectedFps);
+              return;
+            }
+            console.log(`[FFmpeg] Probe ${res}@${fps}fps not supported (exit ${code}), trying next...`);
+            fpsIndex++;
+            if (fpsIndex >= FRAMERATES.length) {
+              fpsIndex = 0;
+              resIndex++;
+            }
             tryNext();
           }
         });
@@ -492,7 +516,57 @@ class FFmpegController {
         proc.on('error', () => {
           clearTimeout(timeout);
           if (!succeeded && !resolved) {
-            index++;
+            fpsIndex++;
+            if (fpsIndex >= FRAMERATES.length) {
+              fpsIndex = 0;
+              resIndex++;
+            }
+            tryNext();
+          }
+        });
+      };
+
+      // Try with the exact mode detected from FFmpeg error output
+      const tryExact = (res: string, fps: string) => {
+        if (resolved) return;
+        const proc = spawn(ffmpeg, [
+          '-f', 'avfoundation',
+          '-framerate', fps,
+          '-video_size', res,
+          '-i', `${deviceIndex}:none`,
+          '-frames:v', '1',
+          '-f', 'null',
+          '-',
+        ], { stdio: ['pipe', 'pipe', 'pipe'] });
+
+        let succeeded = false;
+        const timeout = setTimeout(() => { proc.kill('SIGKILL'); }, 5000);
+
+        proc.stderr?.on('data', (data: Buffer) => {
+          if (data.toString().includes('Output #0') || data.toString().includes('frame=')) {
+            succeeded = true;
+            clearTimeout(timeout);
+            proc.kill('SIGKILL');
+            done(res, fps);
+          }
+        });
+
+        proc.on('close', () => {
+          clearTimeout(timeout);
+          if (!succeeded && !resolved) {
+            console.log(`[FFmpeg] Exact mode ${res}@${fps}fps also failed`);
+            // Continue with remaining standard modes
+            fpsIndex++;
+            if (fpsIndex >= FRAMERATES.length) { fpsIndex = 0; resIndex++; }
+            tryNext();
+          }
+        });
+
+        proc.on('error', () => {
+          clearTimeout(timeout);
+          if (!succeeded && !resolved) {
+            fpsIndex++;
+            if (fpsIndex >= FRAMERATES.length) { fpsIndex = 0; resIndex++; }
             tryNext();
           }
         });
@@ -563,43 +637,72 @@ export const ffmpegController = new FFmpegController();
  */
 export function probeVideoDevice(deviceIndex: string): Promise<boolean> {
   const ffmpeg = getFFmpegPath();
+  // Try multiple framerate/resolution combos to handle capture cards (23.976fps, 1080p-only, etc.)
+  const PROBE_CONFIGS = [
+    { framerate: '30', videoSize: '1280x720' },
+    { framerate: '30', videoSize: '1920x1080' },
+    { framerate: '29.97', videoSize: '1920x1080' },
+    { framerate: '25', videoSize: '1920x1080' },
+    { framerate: '23.976', videoSize: '1920x1080' },
+  ];
+
   return new Promise((resolve) => {
-    const proc = spawn(ffmpeg, [
-      '-f', 'avfoundation',
-      '-framerate', '30',
-      '-video_size', '1280x720',
-      '-i', `${deviceIndex}:none`,
-      '-frames:v', '1',
-      '-f', 'null',
-      '-',
-    ], { stdio: ['pipe', 'pipe', 'pipe'] });
+    let configIndex = 0;
+    let resolved = false;
 
-    let succeeded = false;
-
-    const timeout = setTimeout(() => {
-      proc.kill('SIGKILL');
-      if (!succeeded) resolve(false);
-    }, 5000);
-
-    proc.stderr?.on('data', (data: Buffer) => {
-      const msg = data.toString();
-      if (msg.includes('Output #0') || msg.includes('frame=')) {
-        succeeded = true;
-        clearTimeout(timeout);
-        proc.kill('SIGKILL');
-        resolve(true);
+    const tryConfig = () => {
+      if (resolved) return;
+      if (configIndex >= PROBE_CONFIGS.length) {
+        resolve(false);
+        return;
       }
-    });
 
-    proc.on('close', () => {
-      clearTimeout(timeout);
-      if (!succeeded) resolve(false);
-    });
+      const { framerate, videoSize } = PROBE_CONFIGS[configIndex];
+      const proc = spawn(ffmpeg, [
+        '-f', 'avfoundation',
+        '-framerate', framerate,
+        '-video_size', videoSize,
+        '-i', `${deviceIndex}:none`,
+        '-frames:v', '1',
+        '-f', 'null',
+        '-',
+      ], { stdio: ['pipe', 'pipe', 'pipe'] });
 
-    proc.on('error', () => {
-      clearTimeout(timeout);
-      resolve(false);
-    });
+      let succeeded = false;
+
+      const timeout = setTimeout(() => {
+        proc.kill('SIGKILL');
+      }, 5000);
+
+      proc.stderr?.on('data', (data: Buffer) => {
+        const msg = data.toString();
+        if (msg.includes('Output #0') || msg.includes('frame=')) {
+          succeeded = true;
+          resolved = true;
+          clearTimeout(timeout);
+          proc.kill('SIGKILL');
+          resolve(true);
+        }
+      });
+
+      proc.on('close', () => {
+        clearTimeout(timeout);
+        if (!succeeded && !resolved) {
+          configIndex++;
+          tryConfig();
+        }
+      });
+
+      proc.on('error', () => {
+        clearTimeout(timeout);
+        if (!succeeded && !resolved) {
+          configIndex++;
+          tryConfig();
+        }
+      });
+    };
+
+    tryConfig();
   });
 }
 

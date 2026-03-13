@@ -78,6 +78,9 @@ export interface BaysideAPI {
   getSelectedDevice: () => Promise<VideoDevice | null>;
   selectDevice: (device: VideoDevice) => Promise<void>;
   probeVideoDevice: (deviceId: string) => Promise<boolean>;
+  hasDeckLinkSupport: () => Promise<boolean>;
+  buildDeckLinkFfmpeg: () => Promise<{ success: boolean; error?: string }>;
+  onDeckLinkBuildProgress: (callback: (message: string) => void) => () => void;
   listAudioDevices: () => Promise<AudioDevice[]>;
   getSelectedAudioDevice: () => Promise<AudioDevice | null>;
   selectAudioDevice: (device: AudioDevice | null) => Promise<void>;

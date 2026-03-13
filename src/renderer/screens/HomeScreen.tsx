@@ -392,6 +392,10 @@ function CameraPanel({
   const [scanning, setScanning] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
+  const [deckLinkWarning, setDeckLinkWarning] = useState(false);
+  const [buildStatus, setBuildStatus] = useState<'idle' | 'building' | 'need-sdk' | 'done' | 'error'>('idle');
+  const [buildLog, setBuildLog] = useState<string[]>([]);
+  const buildStarted = useRef(false);
 
   useEffect(() => {
     loadDevices();
@@ -418,10 +422,55 @@ function CameraPanel({
 
       setDevices([...connectedFfmpeg, ...browserDevices]);
       setSelected(current);
+
+      // Check if Blackmagic hardware is connected but ffmpeg lacks DeckLink support
+      const hasBlackmagicHardware = [...connectedFfmpeg, ...browserDevices].some(
+        (d) => /blackmagic|decklink|ultrastudio/i.test(d.name),
+      );
+      if (hasBlackmagicHardware) {
+        const supported = await window.baysideAPI.hasDeckLinkSupport();
+        if (!supported) {
+          setDeckLinkWarning(true);
+          if (!buildStarted.current) {
+            buildStarted.current = true;
+            handleBuildDeckLink();
+          }
+        }
+      } else {
+        setDeckLinkWarning(false);
+      }
     } catch (err) {
       console.error('Failed to list devices:', err);
     } finally {
       setScanning(false);
+    }
+  }
+
+  async function handleBuildDeckLink() {
+    setBuildStatus('building');
+    setBuildLog([]);
+
+    let needsSdk = false;
+    const unsubscribe = window.baysideAPI.onDeckLinkBuildProgress((msg) => {
+      setBuildLog((prev) => [...prev.slice(-50), msg]);
+      if (msg.includes('NEED_SDK')) {
+        needsSdk = true;
+        setBuildStatus('need-sdk');
+      }
+    });
+
+    try {
+      const result = await window.baysideAPI.buildDeckLinkFfmpeg();
+      unsubscribe();
+      if (result.success) {
+        setBuildStatus('done');
+        setDeckLinkWarning(false);
+      } else if (!needsSdk) {
+        setBuildStatus('error');
+      }
+    } catch {
+      unsubscribe();
+      if (!needsSdk) setBuildStatus('error');
     }
   }
 
@@ -456,7 +505,11 @@ function CameraPanel({
     setTesting(false);
 
     if (!works) {
-      setError(`"${device.name}" could not be opened`);
+      if (/blackmagic|decklink|ultrastudio/i.test(device.name) && deckLinkWarning) {
+        setError(`"${device.name}" requires a DeckLink-capable FFmpeg. See the warning below.`);
+      } else {
+        setError(`"${device.name}" could not be opened`);
+      }
       onDeviceChanged();
       return;
     }
@@ -500,6 +553,65 @@ function CameraPanel({
             }
           />
         ))
+      )}
+
+      {(buildStatus === 'idle' || buildStatus === 'building') && deckLinkWarning && (
+        <div className="mt-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+            <p className="text-blue-400 text-xs font-medium">Installing DeckLink support...</p>
+          </div>
+          <p className="text-blue-400/70 text-xs">This may take several minutes.</p>
+          {buildLog.length > 0 && (
+            <p className="text-blue-400/50 text-xs mt-1 font-mono truncate">{buildLog[buildLog.length - 1]}</p>
+          )}
+        </div>
+      )}
+
+      {buildStatus === 'need-sdk' && (
+        <div className="mt-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+          <p className="text-yellow-400 text-xs font-medium mb-1">DeckLink SDK needed</p>
+          <p className="text-yellow-400/80 text-xs leading-relaxed mb-2">
+            Download the free DeckLink SDK from Blackmagic Design and leave it in your
+            Downloads folder, then try again.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => window.open('https://www.blackmagicdesign.com/developer/products/capture-and-playback/sdk-and-software')}
+              className="flex-1 py-2 px-3 rounded-md bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 text-xs font-medium transition-colors cursor-pointer"
+            >
+              Download SDK
+            </button>
+            <button
+              onClick={handleBuildDeckLink}
+              className="flex-1 py-2 px-3 rounded-md bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 text-xs font-medium transition-colors cursor-pointer"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      )}
+
+      {buildStatus === 'done' && (
+        <div className="mt-3 p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+          <p className="text-green-400 text-xs font-medium mb-1">DeckLink support installed</p>
+          <p className="text-green-400/80 text-xs">Restart the app to use your Blackmagic device.</p>
+        </div>
+      )}
+
+      {buildStatus === 'error' && (
+        <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+          <p className="text-red-400 text-xs font-medium mb-1">Installation failed</p>
+          <p className="text-red-400/80 text-xs leading-relaxed mb-2">
+            {buildLog.length > 0 ? buildLog[buildLog.length - 1] : 'An error occurred during installation.'}
+          </p>
+          <button
+            onClick={handleBuildDeckLink}
+            className="w-full py-2 px-3 rounded-md bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs font-medium transition-colors cursor-pointer"
+          >
+            Retry
+          </button>
+        </div>
       )}
 
       {testing && (

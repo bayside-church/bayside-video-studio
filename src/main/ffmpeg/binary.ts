@@ -77,3 +77,10 @@ export function getFFmpegPath(): string {
 export function hasDeckLinkSupport(): boolean {
   return supportsDeckLink(getFFmpegPath());
 }
+
+/**
+ * Clear the cached path so the next getFFmpegPath() call re-evaluates.
+ */
+export function clearCachedPath(): void {
+  cachedPath = null;
+}

@@ -1,8 +1,10 @@
-import { ipcMain, BrowserWindow } from 'electron';
+import { ipcMain, BrowserWindow, app } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { spawn } from 'child_process';
 import { listAllDevices, listAllAudioDevices } from '../ffmpeg/devices';
+import { hasDeckLinkSupport, clearCachedPath } from '../ffmpeg/binary';
 import { ffmpegController, probeVideoDevice, probeDeckLinkDevice } from '../ffmpeg/controller';
 import {
   getSelectedDevice, setSelectedDevice, getSelectedAudioDevice, setSelectedAudioDevice,
@@ -96,6 +98,10 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('bayside:list-devices', async () => {
     return await listAllDevices();
+  });
+
+  ipcMain.handle('bayside:has-decklink-support', async () => {
+    return hasDeckLinkSupport();
   });
 
   ipcMain.handle('bayside:probe-video-device', async (_event, deviceId: string) => {
@@ -368,5 +374,58 @@ export function registerIpcHandlers(getWindow: () => BrowserWindow | null) {
 
   ipcMain.handle('bayside:get-missing-settings', async () => {
     return getMissingRequiredSettings();
+  });
+
+  ipcMain.handle('bayside:build-decklink-ffmpeg', async (): Promise<{ success: boolean; error?: string }> => {
+    const win = getWindow();
+    const send = (msg: string) => {
+      console.log(`[DeckLink Build] ${msg}`);
+      win?.webContents.send('bayside:decklink-build-progress', msg);
+    };
+
+    const scriptPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'scripts', 'build-ffmpeg.sh')
+      : path.join(app.getAppPath(), 'scripts', 'build-ffmpeg.sh');
+
+    if (!fs.existsSync(scriptPath)) {
+      return { success: false, error: 'Build script not found.' };
+    }
+
+    return new Promise((resolve) => {
+      send('Starting DeckLink FFmpeg build...');
+
+      const proc = spawn('bash', [scriptPath], {
+        env: { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}` },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+
+      proc.stdout?.on('data', (data: Buffer) => {
+        for (const line of data.toString().split('\n').filter(Boolean)) {
+          send(line);
+        }
+      });
+
+      proc.stderr?.on('data', (data: Buffer) => {
+        for (const line of data.toString().split('\n').filter(Boolean)) {
+          send(line);
+        }
+      });
+
+      proc.on('close', (code) => {
+        if (code === 0) {
+          clearCachedPath();
+          send('Build complete! Restart the app to use DeckLink.');
+          resolve({ success: true });
+        } else {
+          send(`Build failed with exit code ${code}`);
+          resolve({ success: false, error: `Build failed (exit code ${code}). Check the logs for details.` });
+        }
+      });
+
+      proc.on('error', (err) => {
+        send(`Build error: ${err.message}`);
+        resolve({ success: false, error: err.message });
+      });
+    });
   });
 }

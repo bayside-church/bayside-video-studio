@@ -27,11 +27,14 @@ function listDeckLinkDevices(ffmpeg: string): Promise<VideoDevice[]> {
   return new Promise((resolve) => {
     const proc = execFile(
       ffmpeg,
-      ['-f', 'decklink', '-list_devices', '1', '-i', 'dummy'],
+      ['-hide_banner', '-f', 'decklink', '-list_devices', '1', '-i', 'dummy'],
       { timeout: 10_000 },
       (_error, _stdout, stderr) => {
         const output = stderr ?? '';
         console.log('[DeckLink] Raw device output:\n', output);
+        if (output.includes('drivers are too old')) {
+          console.warn('[DeckLink] Installed DeckLink drivers are too old for the SDK. Device enumeration may fail.');
+        }
         const devices: VideoDevice[] = [];
         let deviceIndex = 0;
 
@@ -53,7 +56,7 @@ function listDeckLinkDevices(ffmpeg: string): Promise<VideoDevice[]> {
           // New format (FFmpeg 7+): quoted name, possibly with log prefix
           // e.g. [in#0 @ 0x...] \t'UltraStudio 4K Mini'
           const quotedMatch = line.match(/'([^']+)'/);
-          if (quotedMatch && !line.includes('DeckLink input devices') && !line.includes('Could not') && !line.includes('option is deprecated') && !line.includes('drivers are too old')) {
+          if (quotedMatch && !line.includes('DeckLink input devices') && !line.includes('Could not') && !line.includes('option is deprecated') && !line.includes('drivers are too old') && !line.includes('configuration:')) {
             const name = quotedMatch[1].trim();
             if (name) {
               devices.push({

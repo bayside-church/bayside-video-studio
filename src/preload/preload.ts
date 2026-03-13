@@ -42,6 +42,13 @@ const api: BaysideAPI = {
   getSelectedDevice: () => ipcRenderer.invoke('bayside:get-selected-device'),
   selectDevice: (device: VideoDevice) => ipcRenderer.invoke('bayside:select-device', device),
   probeVideoDevice: (deviceId: string) => ipcRenderer.invoke('bayside:probe-video-device', deviceId),
+  hasDeckLinkSupport: () => ipcRenderer.invoke('bayside:has-decklink-support'),
+  buildDeckLinkFfmpeg: () => ipcRenderer.invoke('bayside:build-decklink-ffmpeg'),
+  onDeckLinkBuildProgress: (callback: (message: string) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, message: string) => callback(message);
+    ipcRenderer.on('bayside:decklink-build-progress', handler);
+    return () => ipcRenderer.removeListener('bayside:decklink-build-progress', handler);
+  },
   listAudioDevices: () => ipcRenderer.invoke('bayside:list-audio-devices'),
   getSelectedAudioDevice: () => ipcRenderer.invoke('bayside:get-selected-audio-device'),
   selectAudioDevice: (device: AudioDevice | null) => ipcRenderer.invoke('bayside:select-audio-device', device),
